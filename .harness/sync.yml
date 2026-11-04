@@ -6,10 +6,9 @@ groups:
   - gemini
 
 overrides:
-  # Kotlin / 프론트엔드 / the-sdk 전용 항목 제외
+  # Kotlin / 프론트엔드 전용 항목 제외
   claude/skills/kotest-guide: false
   claude/skills/kotlin-spring-arch: false
-  claude/skills/the-sdk: false
   claude/skills/nextjs-fsd-architecture: false
   claude/skills/nextjs-turborepo-fsd: false
   claude/skills/nextjs-package-boundaries: false
@@ -26,7 +25,6 @@ overrides:
   claude/agents/frontend-convention-validator: false
   codex/skills/kotest-guide: false
   codex/skills/kotlin-spring-arch: false
-  codex/skills/the-sdk: false
   codex/skills/nextjs-fsd-architecture: false
   codex/skills/nextjs-turborepo-fsd: false
   codex/skills/nextjs-package-boundaries: false
