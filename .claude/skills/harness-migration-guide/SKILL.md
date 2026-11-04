@@ -1,5 +1,5 @@
 ---
-name: migration-guide
+name: harness-migration-guide
 description: Guide for DB schema changes and Entity modifications — impact analysis, correct change order (Entity → DTO → Repository → Service → Tests), JPA DDL strategy, and 2-phase column deletion.
 ---
 

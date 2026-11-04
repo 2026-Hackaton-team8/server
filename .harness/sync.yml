@@ -15,6 +15,12 @@ overrides:
   claude/skills/nextjs-package-boundaries: false
   claude/skills/tailwind-shadcn: false
   claude/skills/tanstack-query-zod: false
+  # 전역 ~/.claude/skills 와 이름이 겹쳐 harness-* 로 이름을 바꿔 로컬 관리
+  claude/skills/test: false
+  claude/skills/write-pr: false
+  claude/skills/migration-guide: false
+  claude/skills/security-checklist: false
+  claude/skills/systematic-debugging: false
   claude/agents/kotlin-convention-validator: false
   claude/agents/kotlin-test-fixer: false
   claude/agents/frontend-convention-validator: false

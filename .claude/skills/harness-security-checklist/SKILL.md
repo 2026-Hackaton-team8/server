@@ -1,5 +1,5 @@
 ---
-name: security-checklist
+name: harness-security-checklist
 description: Verify security vulnerabilities — hardcoded secrets, SQL injection, JWT validation, API key masking, sensitive logging, and authorization checks. Run before merging any auth or API-related changes.
 ---
 

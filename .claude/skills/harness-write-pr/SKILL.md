@@ -1,5 +1,5 @@
 ---
-name: write-pr
+name: harness-write-pr
 description: Generate a PR title, body, and a single label from commits since the base branch, then create the PR on GitHub. Handles base branch detection, label selection, and PR creation end-to-end.
 allowed-tools: Bash(git *:*), Bash(bash *create-pr.sh:*), Bash(cat *:*), Read, Write
 ---
