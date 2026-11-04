@@ -1,0 +1,46 @@
+# themoment-ai-harness-sync 설정 (Java / Spring Boot 백엔드)
+# https://github.com/themoment-team/themoment-ai-harness-sync/blob/main/docs/guide/sync-configuration.md
+groups:
+  - claude
+  - codex
+  - gemini
+
+overrides:
+  # Kotlin / 프론트엔드 / the-sdk 전용 항목 제외
+  claude/skills/kotest-guide: false
+  claude/skills/kotlin-spring-arch: false
+  claude/skills/the-sdk: false
+  claude/skills/nextjs-fsd-architecture: false
+  claude/skills/nextjs-turborepo-fsd: false
+  claude/skills/nextjs-package-boundaries: false
+  claude/skills/tailwind-shadcn: false
+  claude/skills/tanstack-query-zod: false
+  claude/agents/kotlin-convention-validator: false
+  claude/agents/kotlin-test-fixer: false
+  claude/agents/frontend-convention-validator: false
+  codex/skills/kotest-guide: false
+  codex/skills/kotlin-spring-arch: false
+  codex/skills/the-sdk: false
+  codex/skills/nextjs-fsd-architecture: false
+  codex/skills/nextjs-turborepo-fsd: false
+  codex/skills/nextjs-package-boundaries: false
+  codex/skills/tailwind-shadcn: false
+  codex/skills/tanstack-query-zod: false
+  codex/agents/kotlin-convention-validator: false
+  codex/agents/kotlin-test-fixer: false
+  codex/agents/frontend-convention-validator: false
+
+  # 훅 (opt-in)
+  claude/hooks/dispatcher: true
+  claude/settings: true
+  claude/hooks/secret-guard: true
+  claude/hooks/command-guard: true
+  claude/hooks/gradle-test: true
+  codex/hooks/dispatcher: true
+  codex/hooks-json: true
+  codex/hooks/secret-guard: true
+  codex/hooks/command-guard: true
+  codex/hooks/gradle-test: true
+
+base_branch: main
+language: ko
