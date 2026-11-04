@@ -19,7 +19,6 @@ import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.config.jwt.JwtTokenProvider;
-import org.study.jibeo.global.exception.BusinessException;
 import org.study.jibeo.global.exception.ErrorCode;
 
 @Service
@@ -40,10 +39,10 @@ public class AuthService {
     @Transactional
     public SignUpResponse signUp(SignUpRequest request) {
         if (userRepository.existsByLoginId(request.loginId())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_LOGIN_ID);
+            throw ErrorCode.DUPLICATE_LOGIN_ID.toException();
         }
         Company company = companyRepository.findById(request.companyId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.COMPANY_NOT_FOUND));
+                .orElseThrow(() -> ErrorCode.COMPANY_NOT_FOUND.toException());
         validateRoleAgainstCompany(request.role(), company.getType());
 
         User user = User.builder()
@@ -58,9 +57,9 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByLoginId(request.loginId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+                .orElseThrow(() -> ErrorCode.INVALID_CREDENTIALS.toException());
         if (!passwordEncoder.matches(request.pw(), user.getPw())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+            throw ErrorCode.INVALID_CREDENTIALS.toException();
         }
         Long companyId = user.getCompany().getId();
         String accessToken = tokenProvider.createAccessToken(user.getId(), user.getRole(), companyId);
@@ -74,14 +73,14 @@ public class AuthService {
         Long userId = Long.valueOf(claims.getSubject());
 
         String stored = refreshTokenStore.find(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+                .orElseThrow(() -> ErrorCode.INVALID_REFRESH_TOKEN.toException());
         if (!stored.equals(refreshToken)) {
             refreshTokenStore.delete(userId);
-            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+            throw ErrorCode.INVALID_REFRESH_TOKEN.toException();
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> ErrorCode.USER_NOT_FOUND.toException());
         Long companyId = user.getCompany().getId();
 
         String newAccess = tokenProvider.createAccessToken(user.getId(), user.getRole(), companyId);
@@ -107,11 +106,11 @@ public class AuthService {
             Jws<Claims> jws = tokenProvider.parse(refreshToken);
             Claims claims = jws.getPayload();
             if (!tokenProvider.isRefreshToken(claims)) {
-                throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+                throw ErrorCode.INVALID_REFRESH_TOKEN.toException();
             }
             return claims;
         } catch (JwtException | IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+            throw ErrorCode.INVALID_REFRESH_TOKEN.toException();
         }
     }
 
@@ -119,7 +118,7 @@ public class AuthService {
         boolean ok = (companyType == CompanyType.USER_COMPANY && role == UserRole.WORKER)
                 || (companyType == CompanyType.MAKER_COMPANY && role == UserRole.STAFF);
         if (!ok) {
-            throw new BusinessException(ErrorCode.ROLE_COMPANY_MISMATCH);
+            throw ErrorCode.ROLE_COMPANY_MISMATCH.toException();
         }
     }
 }

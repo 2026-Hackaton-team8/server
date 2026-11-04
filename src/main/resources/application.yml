@@ -26,3 +26,13 @@ jwt:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# the-sdk (https://github.com/themoment-team/the-sdk)
+sdk:
+  swagger:
+    title: Jibeo API
+    description: Jibeo API Documentation
+    paths-to-match:
+      - /api/**
+  exception:
+    use-english-message: false
