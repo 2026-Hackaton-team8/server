@@ -16,16 +16,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build jar
         run: ./gradlew bootJar --no-daemon
@@ -61,7 +61,7 @@ jobs:
           sudo systemctl restart jibeo
 
           for i in $(seq 1 60); do
-            if curl -sf -o /dev/null http://localhost:8080/v3/api-docs; then
+            if curl -sf -o /dev/null http://localhost:8080/actuator/health; then
               echo "Deploy succeeded"
               exit 0
             fi

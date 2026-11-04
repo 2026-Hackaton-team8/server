@@ -27,8 +27,25 @@ jwt:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 # the-sdk (https://github.com/themoment-team/the-sdk)
 sdk:
+  logging:
+    not-logging-urls:
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /actuator/**
+  response:
+    not-wrapping-urls:
+      - /v3/api-docs/**
+      - /v3/api-docs
+      - /swagger-ui/**
+      - /actuator/**
   swagger:
     title: Jibeo API
     description: Jibeo API Documentation
