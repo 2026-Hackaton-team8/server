@@ -17,6 +17,7 @@ import java.util.List;
 public record RequestDetailResponse(
         Long id,
         String requestNo,
+        Long consultationId,
         RequestStatus status,
         Urgency urgency,
         EquipmentState equipmentState,
@@ -53,7 +54,8 @@ public record RequestDetailResponse(
         Equipment e = r.getEquipment();
         EquipmentModel m = e.getEquipmentModel();
         User engineer = r.getEngineer();
-        return new RequestDetailResponse(r.getId(), r.getRequestNo(), r.getStatus(), r.getUrgency(),
+        return new RequestDetailResponse(r.getId(), r.getRequestNo(),
+                r.getConsultation() == null ? null : r.getConsultation().getId(), r.getStatus(), r.getUrgency(),
                 r.getEquipmentState(), r.getCallReason(), r.getSymptomDetail(), r.getAiSummary(),
                 new EquipmentInfo(e.getId(), e.getName(), e.getLocation(), e.getSerialNumber(),
                         m.getId(), m.getCode(), m.getName()),

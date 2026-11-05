@@ -56,7 +56,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,https://client-nu-six-13.vercel.app}
       SERVER_FORWARD_HEADERS_STRATEGY: native
       TZ: Asia/Seoul
     ports:

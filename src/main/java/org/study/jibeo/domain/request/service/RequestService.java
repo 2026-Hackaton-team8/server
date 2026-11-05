@@ -5,6 +5,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.study.jibeo.domain.consultation.dto.MessageResponse;
+import org.study.jibeo.domain.consultation.model.Consultation;
+import org.study.jibeo.domain.consultation.repository.ConsultationRepository;
+import org.study.jibeo.domain.consultation.service.ConsultationService;
 import org.study.jibeo.domain.equipment.model.Equipment;
 import org.study.jibeo.domain.equipment.repository.EquipmentRepository;
 import org.study.jibeo.domain.file.service.FileService;
@@ -41,6 +45,8 @@ public class RequestService {
     private final UserRepository userRepository;
     private final RequestAttachmentRepository attachmentRepository;
     private final FileStorage fileStorage;
+    private final ConsultationRepository consultationRepository;
+    private final ConsultationService consultationService;
 
     // ---------- 사용 업체 ----------
 
@@ -52,7 +58,21 @@ public class RequestService {
         CreateRequestRequest.Contact contact = body.contact();
         Map<String, FileStorage.FileMeta> attachments = checkAttachments(companyId, body.attachmentKeys());
 
+        Consultation consultation = null;
+        CallReason callReason = CallReason.NEEDS_EXPERT;
+        if (body.consultationId() != null) {
+            consultation = consultationRepository.findDetailById(body.consultationId())
+                    .filter(c -> c.isOwnedBy(companyId))
+                    .orElseThrow(ErrorCode.CONSULTATION_NOT_FOUND::toException);
+            if (!consultation.getEquipment().getId().equals(equipment.getId())) {
+                throw ErrorCode.CONSULTATION_EQUIPMENT_MISMATCH.toException();
+            }
+            callReason = consultationService.callReasonOf(consultation);
+            consultation.escalate();
+        }
+
         Request request = requestRepository.save(Request.builder()
+                .consultation(consultation)
                 .equipment(equipment)
                 .company(equipment.getCompany())
                 .user(userRepository.getReferenceById(userId))
@@ -60,8 +80,7 @@ public class RequestService {
                 .symptomDetail(body.symptomDetail())
                 .equipmentState(body.equipmentState())
                 .urgency(body.urgency())
-                // TODO AI 상담 연동 후 상담 기록으로 판단 (SOLUTION_FAILED, LOW_CONFIDENCE 등)
-                .callReason(CallReason.NEEDS_EXPERT)
+                .callReason(callReason)
                 .reporterName(contact.reporterName())
                 .reporterPhone(contact.reporterPhone())
                 .companyPhone(contact.companyPhone())
@@ -127,7 +146,14 @@ public class RequestService {
         return toDetail(request);
     }
 
-    public List<EngineerResponse> getEngineers(Long makerCompanyId) {
+    /** 호출 상세의 "대화 전체 보기". 상담 없이 바로 호출했으면 빈 목록 */
+    public List<MessageResponse> getConversation(Long makerCompanyId, Long requestId) {
+        Request request = findReceived(makerCompanyId, requestId);
+        return request.getConsultation() == null ? List.of()
+                : consultationService.getMessages(request.getConsultation().getId());
+    }
+
+        public List<EngineerResponse> getEngineers(Long makerCompanyId) {
         return userRepository.findAllByCompanyAndRole(makerCompanyId, UserRole.STAFF).stream()
                 .map(EngineerResponse::from).toList();
     }

@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.study.jibeo.domain.company.model.Company;
+import org.study.jibeo.domain.consultation.model.Consultation;
 import org.study.jibeo.domain.equipment.model.Equipment;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.global.entity.BaseEntity;
@@ -35,6 +36,11 @@ public class Request extends BaseEntity {
     /** 요청번호 (예: AS-0001). id 를 받은 뒤 정하므로 저장 직후 채운다 */
     @Column(name = "request_no", unique = true, length = 20)
     private String requestNo;
+
+    /** 이 호출로 이어진 AI 상담 (상담 없이 바로 호출하면 null) */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "consultation_id")
+    private Consultation consultation;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "equipment_id", nullable = false)
@@ -96,9 +102,10 @@ public class Request extends BaseEntity {
     private LocalDateTime visitAt;
 
     @Builder
-    private Request(Equipment equipment, Company company, User user, Company makerCompany, String symptomDetail,
+    private Request(Consultation consultation, Equipment equipment, Company company, User user, Company makerCompany, String symptomDetail,
                     EquipmentState equipmentState, Urgency urgency, CallReason callReason, String reporterName,
                     String reporterPhone, String companyPhone, AiSummary aiSummary) {
+        this.consultation = consultation;
         this.equipment = equipment;
         this.company = company;
         this.user = user;

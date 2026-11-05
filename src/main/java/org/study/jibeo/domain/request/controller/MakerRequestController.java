@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.study.jibeo.domain.consultation.dto.MessageResponse;
 import org.study.jibeo.domain.request.dto.AssignRequest;
 import org.study.jibeo.domain.request.dto.EngineerResponse;
 import org.study.jibeo.domain.request.dto.InboxResponse;
@@ -47,6 +48,13 @@ public class MakerRequestController {
     @GetMapping("/requests/{requestId}")
     public RequestDetailResponse getRequest(@PathVariable Long requestId) {
         return requestService.getReceived(CurrentUser.companyId(), requestId);
+    }
+
+    /** 호출로 이어진 AI 상담 대화 전체 (상담 없이 호출했으면 빈 목록) */
+    @Operation(summary = "대화 전체 보기")
+    @GetMapping("/requests/{requestId}/conversation")
+    public List<MessageResponse> getConversation(@PathVariable Long requestId) {
+        return requestService.getConversation(CurrentUser.companyId(), requestId);
     }
 
     /** 엔지니어 배정·재배정 → ASSIGNED */

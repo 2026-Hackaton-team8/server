@@ -23,6 +23,8 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
             """)
     Optional<Request> findDetailById(@Param("id") Long id);
 
+    Optional<Request> findFirstByConsultationId(Long consultationId);
+
     /** 사용 업체: 우리 회사가 보낸 호출 */
     @EntityGraph(attributePaths = {"equipment", "equipment.equipmentModel", "company"})
     List<Request> findAllByCompanyIdOrderByIdDesc(Long companyId);
