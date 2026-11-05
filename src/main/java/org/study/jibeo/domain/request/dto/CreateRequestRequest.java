@@ -9,9 +9,12 @@ import org.study.jibeo.domain.request.model.EquipmentState;
 import org.study.jibeo.domain.request.model.Urgency;
 import org.study.jibeo.global.validation.Phone;
 
+import java.util.List;
+
 /**
  * 호출 신고서 제출. contact 는 내 정보·회사 정보로 미리 채워 보내고, 신고서에서 바꿀 수 있다.
- * TODO 상담(consultationId)·첨부 파일(attachmentKeys)은 해당 기능 구현 때 추가
+ * attachmentKeys 는 POST /api/files 응답의 fileKey (최대 5개, 선택).
+ * TODO 상담(consultationId)은 AI 상담 구현 때 추가
  */
 public record CreateRequestRequest(
         @NotNull Long equipmentId,
@@ -19,7 +22,8 @@ public record CreateRequestRequest(
         @NotBlank @Size(max = 2000) String symptomDetail,
         @NotNull EquipmentState equipmentState,
         @NotNull Urgency urgency,
-        @NotNull @Valid Contact contact
+        @NotNull @Valid Contact contact,
+        @Size(max = 5) List<@NotBlank String> attachmentKeys
 ) {
 
     public record Contact(

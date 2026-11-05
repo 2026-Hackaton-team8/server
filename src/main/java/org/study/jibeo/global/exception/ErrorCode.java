@@ -23,7 +23,11 @@ public enum ErrorCode {
     INVALID_REQUEST_STATUS(HttpStatus.CONFLICT, "이미 종료된 호출입니다."),
     ENGINEER_NOT_FOUND(HttpStatus.BAD_REQUEST, "배정할 수 없는 엔지니어입니다."),
     REQUEST_NOT_ASSIGNED(HttpStatus.CONFLICT, "엔지니어를 배정한 호출만 수리 이력을 기록할 수 있습니다."),
-    PART_NOT_IN_MODEL(HttpStatus.BAD_REQUEST, "이 설비 모델의 부품이 아닙니다.");
+    PART_NOT_IN_MODEL(HttpStatus.BAD_REQUEST, "이 설비 모델의 부품이 아닙니다."),
+    EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 파일은 올릴 수 없습니다."),
+    UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "이미지(jpeg, png, webp, heic)나 영상(mp4, mov, webm)만 올릴 수 있습니다."),
+    UNREADABLE_FILE(HttpStatus.BAD_REQUEST, "파일을 읽을 수 없습니다."),
+    ATTACHMENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "첨부 파일을 찾을 수 없습니다. 파일을 다시 올려 주세요.");
 
     private final HttpStatus status;
     private final String message;
