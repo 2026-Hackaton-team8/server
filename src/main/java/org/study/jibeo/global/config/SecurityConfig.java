@@ -16,6 +16,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.study.jibeo.global.config.cors.CorsProperties;
 import org.study.jibeo.global.config.jwt.JwtAuthenticationFilter;
+import org.study.jibeo.global.config.security.SdkSecurityErrorHandler;
 
 import java.util.List;
 
@@ -32,6 +33,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsProperties corsProperties;
+    private final SdkSecurityErrorHandler sdkSecurityErrorHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -45,8 +47,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(SWAGGER_URLS).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        // TODO: 인증이 필요한 API가 생기면 경로별로 authenticated()를 지정 (운영 배포 전 필수)
-                        .anyRequest().permitAll())
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(sdkSecurityErrorHandler)
+                        .accessDeniedHandler(sdkSecurityErrorHandler))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
