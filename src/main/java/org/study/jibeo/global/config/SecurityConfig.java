@@ -18,6 +18,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.study.jibeo.global.config.cors.CorsProperties;
 import org.study.jibeo.global.config.jwt.JwtAuthenticationFilter;
 import org.study.jibeo.global.config.security.SdkSecurityErrorHandler;
+import org.study.jibeo.global.storage.FileViewUrls;
 
 import java.util.List;
 
@@ -54,6 +55,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/maker/**").hasRole("STAFF")
                         .requestMatchers("/api/equipments/**").hasRole("WORKER")
                         .requestMatchers("/api/requests/**").hasRole("WORKER")
+                        // 보기 주소는 서명으로 확인한다 (<img src> 는 JWT 헤더를 못 보낸다)
+                        .requestMatchers(HttpMethod.GET, FileViewUrls.PATH).permitAll()
                         .requestMatchers("/api/files/**").hasRole("WORKER")
                         .requestMatchers("/api/consultations/**").hasRole("WORKER")
                         .anyRequest().authenticated())
