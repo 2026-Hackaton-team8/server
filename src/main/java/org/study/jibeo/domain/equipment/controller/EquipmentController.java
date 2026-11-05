@@ -12,6 +12,8 @@ import org.study.jibeo.domain.equipment.dto.CreateEquipmentRequest;
 import org.study.jibeo.domain.equipment.dto.EquipmentDetailResponse;
 import org.study.jibeo.domain.equipment.dto.EquipmentResponse;
 import org.study.jibeo.domain.equipment.service.EquipmentService;
+import org.study.jibeo.domain.repairhistory.dto.RepairHistoryResponse;
+import org.study.jibeo.domain.repairhistory.service.RepairHistoryService;
 import org.study.jibeo.global.security.CurrentUser;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.List;
 public class EquipmentController {
 
     private final EquipmentService equipmentService;
+    private final RepairHistoryService repairHistoryService;
 
     @GetMapping
     public List<EquipmentResponse> getMyEquipments() {
@@ -37,5 +40,11 @@ public class EquipmentController {
     @GetMapping("/{equipmentId}")
     public EquipmentDetailResponse getDetail(@PathVariable Long equipmentId) {
         return equipmentService.getDetail(CurrentUser.companyId(), equipmentId);
+    }
+
+    /** 이 설비의 수리 이력 (최신순) */
+    @GetMapping("/{equipmentId}/repair-histories")
+    public List<RepairHistoryResponse> getRepairHistories(@PathVariable Long equipmentId) {
+        return repairHistoryService.getEquipmentHistories(CurrentUser.companyId(), equipmentId);
     }
 }

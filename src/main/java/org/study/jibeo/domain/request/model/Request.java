@@ -131,6 +131,14 @@ public class Request extends BaseEntity {
         this.status = RequestStatus.SELF_RESOLVED;
     }
 
+    /** 수리 이력 기록 → 수리 완료. 엔지니어가 배정된 호출만 가능 */
+    public void complete() {
+        if (status != RequestStatus.ASSIGNED) {
+            throw (status.isOpen() ? ErrorCode.REQUEST_NOT_ASSIGNED : ErrorCode.INVALID_REQUEST_STATUS).toException();
+        }
+        this.status = RequestStatus.COMPLETED;
+    }
+
     public boolean isRequestedBy(Long companyId) {
         return company.getId().equals(companyId);
     }
