@@ -254,6 +254,29 @@ class FoundationApiTest {
     }
 
     @Test
+    void 모델_코드가_붙은_긴_부품_코드도_등록하고_매뉴얼에서_쓸_수_있다() throws Exception {
+        long modelId = createModel("COMPRESSOR-001");
+
+        mockMvc.perform(auth(post("/api/maker/models/" + modelId + "/parts"), makerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"COMPRESSOR-001:PRESSURE_GAUGE","name":"압력계"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value("COMPRESSOR-001:PRESSURE_GAUGE"));
+
+        mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(manual("pressure-low", "COMPRESSOR-001:PRESSURE_GAUGE")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(auth(post("/api/maker/models/" + modelId + "/parts"), makerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"%s\",\"name\":\"x\"}".formatted("P".repeat(65))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 역할에_맞지_않는_API는_403() throws Exception {
         mockMvc.perform(auth(get("/api/maker/models"), workerToken))
                 .andExpect(status().isForbidden())
