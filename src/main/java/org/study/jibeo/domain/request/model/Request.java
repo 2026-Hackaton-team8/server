@@ -6,7 +6,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -45,7 +44,6 @@ public class Request extends BaseEntity {
     @Column(nullable = false, length = 20)
     private RequestType type;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String description;
 

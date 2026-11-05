@@ -4,7 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -41,11 +40,9 @@ public class RepairHistory extends BaseEntity {
     @JoinColumn(name = "request_id", nullable = false)
     private Request request;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String solution;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String cause;
 

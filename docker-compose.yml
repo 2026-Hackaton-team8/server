@@ -1,19 +1,19 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: jibeo-mysql
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: jibeo-postgres
     environment:
-      MYSQL_DATABASE: mydatabase
-      MYSQL_USER: myuser
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: verysecret
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: secret
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pverysecret"]
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -36,13 +36,13 @@ services:
     container_name: jibeo-app
     profiles: ["full"]
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
+      DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: mydatabase
       DB_USERNAME: myuser
       DB_PASSWORD: secret
@@ -57,5 +57,5 @@ services:
       - "8080:8080"
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:

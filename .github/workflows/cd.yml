@@ -9,26 +9,41 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/2026-hackaton-team8/server
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v6
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          distribution: temurin
-          java-version: '21'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Build jar
-        run: ./gradlew bootJar --no-daemon
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Set up SSH
         env:
@@ -40,41 +55,61 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Upload jar
+      - name: Upload compose files
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          JAR=$(ls build/libs/*.jar | grep -v -- '-plain.jar' | head -1)
-          scp -i ~/.ssh/deploy_key "$JAR" "$SERVER_USER@$SERVER_HOST:/home/ubuntu/app/jibeo.jar.new"
+          ssh -i ~/.ssh/deploy_key "$SERVER_USER@$SERVER_HOST" "mkdir -p /home/ubuntu/app/docker/postgres"
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml \
+            "$SERVER_USER@$SERVER_HOST:/home/ubuntu/app/docker-compose.prod.yml"
+          scp -i ~/.ssh/deploy_key docker/postgres/init.sql \
+            "$SERVER_USER@$SERVER_HOST:/home/ubuntu/app/docker/postgres/init.sql"
+
+      # 이 job 동안만 유효한 GITHUB_TOKEN 으로 서버에서 이미지를 받는다 (서버에 장기 토큰을 두지 않음)
+      - name: Log in to GHCR on server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key "$SERVER_USER@$SERVER_HOST" \
+            "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
       - name: Deploy and health check
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$SERVER_USER@$SERVER_HOST" 'bash -s' <<'EOF'
+          ssh -i ~/.ssh/deploy_key "$SERVER_USER@$SERVER_HOST" "bash -s -- ${{ env.IMAGE }}:${{ github.sha }}" <<'EOF'
           set -e
+          NEW_IMAGE="$1"
           cd /home/ubuntu/app
-          [ -f jibeo.jar ] && cp jibeo.jar jibeo.jar.bak
-          mv jibeo.jar.new jibeo.jar
-          sudo systemctl restart jibeo
+          COMPOSE="docker compose -f docker-compose.prod.yml"
+
+          PREV_IMAGE=$(docker inspect --format '{{.Config.Image}}' jibeo-app-1 2>/dev/null || true)
+          docker pull "$NEW_IMAGE"
+          sed -i "s#^APP_IMAGE=.*#APP_IMAGE=$NEW_IMAGE#" .env
+          $COMPOSE up -d
 
           for i in $(seq 1 60); do
             if curl -sf -o /dev/null http://localhost:8080/actuator/health; then
-              echo "Deploy succeeded"
+              echo "Deploy succeeded: $NEW_IMAGE"
+              docker logout ghcr.io
+              docker image prune -f
               exit 0
             fi
             sleep 2
           done
 
           echo "Health check failed. Recent logs:"
-          sudo journalctl -u jibeo -n 50 --no-pager
-          if [ -f jibeo.jar.bak ]; then
-            echo "Rolling back to previous jar"
-            mv jibeo.jar.bak jibeo.jar
-            sudo systemctl restart jibeo
+          $COMPOSE logs --tail 80 app
+          if [ -n "$PREV_IMAGE" ] && [ "$PREV_IMAGE" != "$NEW_IMAGE" ]; then
+            echo "Rolling back to $PREV_IMAGE"
+            sed -i "s#^APP_IMAGE=.*#APP_IMAGE=$PREV_IMAGE#" .env
+            $COMPOSE up -d app
           fi
+          docker logout ghcr.io
           exit 1
           EOF
 

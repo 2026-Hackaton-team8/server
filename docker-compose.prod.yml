@@ -1,0 +1,72 @@
+# 운영 서버 배포용 (로컬 개발은 docker-compose.yml)
+# 서버의 /home/ubuntu/app/.env 에서 비밀 값을 읽는다. .env 는 커밋하지 않는다.
+#   필요한 키: APP_IMAGE, DB_PASSWORD, JWT_SECRET, (선택) CORS_ALLOWED_ORIGINS
+# 외부에는 nginx(443)만 열리고, 아래 포트는 모두 127.0.0.1 에만 바인딩된다.
+
+name: jibeo
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jibeo
+      POSTGRES_USER: jibeo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:5432:5432"   # SSH 터널로 DB 툴 접속용
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jibeo -d jibeo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/2026-hackaton-team8/server:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: jibeo
+      DB_USERNAME: jibeo
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:8080:8080"   # nginx 가 프록시
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  postgres-data:
+  redis-data:
