@@ -15,12 +15,15 @@ public record MeResponse(
         CompanyInfo company
 ) {
 
+    /** company 는 역할 미정(PENDING)이면 null */
+
     public record CompanyInfo(Long id, String name, CompanyType type, String phone, String email) {
     }
 
     public static MeResponse from(User user) {
         Company c = user.getCompany();
         return new MeResponse(user.getId(), user.getLoginId(), user.getName(), user.getPhone(), user.getEmail(),
-                user.getRole(), new CompanyInfo(c.getId(), c.getName(), c.getType(), c.getPhone(), c.getEmail()));
+                user.getRole(),
+                c == null ? null : new CompanyInfo(c.getId(), c.getName(), c.getType(), c.getPhone(), c.getEmail()));
     }
 }

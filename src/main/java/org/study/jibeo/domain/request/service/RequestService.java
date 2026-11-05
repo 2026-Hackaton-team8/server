@@ -117,7 +117,7 @@ public class RequestService {
     }
 
     public List<EngineerResponse> getEngineers(Long makerCompanyId) {
-        return userRepository.findAllByCompanyIdAndRoleOrderByNameAsc(makerCompanyId, UserRole.STAFF).stream()
+        return userRepository.findAllByCompanyAndRole(makerCompanyId, UserRole.STAFF).stream()
                 .map(EngineerResponse::from).toList();
     }
 

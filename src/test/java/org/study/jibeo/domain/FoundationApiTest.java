@@ -75,7 +75,7 @@ class FoundationApiTest {
     }
 
     @Test
-    void 회사를_먼저_등록하고_그_회사로_회원가입한다() throws Exception {
+    void 회사를_등록하고_가입한_뒤_그_회사로_역할을_고른다() throws Exception {
         long companyId = idOf(mockMvc.perform(post("/api/companies")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -86,11 +86,23 @@ class FoundationApiTest {
                 .andExpect(jsonPath("$.data.name").value("새 사용 업체"))
                 .andReturn().getResponse().getContentAsString());
 
+        // 가입(역할 미정) → 로그인 → 등록한 회사로 역할 선택
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"loginId":"newworker","pw":"password123","role":"WORKER",
-                                 "name":"새담당","phone":"010-5555-6666","companyId":%d}
+                                {"loginId":"newworker","pw":"password123","name":"새담당","phone":"010-5555-6666"}
+                                """))
+                .andExpect(status().isOk());
+        String pendingToken = JsonPath.read(mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"loginId":"newworker","pw":"password123"}
+                                """))
+                .andReturn().getResponse().getContentAsString(), "$.data.accessToken");
+        mockMvc.perform(auth(post("/api/me/role"), pendingToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"WORKER","companyId":%d}
                                 """.formatted(companyId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.companyId").value(companyId));
@@ -103,16 +115,6 @@ class FoundationApiTest {
                                  "type":"USER_COMPANY","phone":"062-555-6666"}
                                 """))
                 .andExpect(status().isConflict());
-
-        // 회사 없이는 가입할 수 없다
-        mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"loginId":"nocompany","pw":"password123","role":"WORKER",
-                                 "name":"홍길동","phone":"010-1234-5678"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data[0].field").value("companyId"));
     }
 
     @Test

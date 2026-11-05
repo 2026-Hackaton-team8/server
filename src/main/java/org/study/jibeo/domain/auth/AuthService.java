@@ -15,6 +15,7 @@ import org.study.jibeo.domain.auth.dto.SignUpResponse;
 import org.study.jibeo.domain.company.model.Company;
 import org.study.jibeo.domain.company.model.CompanyType;
 import org.study.jibeo.domain.company.repository.CompanyRepository;
+import org.study.jibeo.domain.user.dto.SelectRoleRequest;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
@@ -41,21 +42,31 @@ public class AuthService {
         if (userRepository.existsByLoginId(request.loginId())) {
             throw ErrorCode.DUPLICATE_LOGIN_ID.toException();
         }
+        User saved = userRepository.save(User.builder()
+                .loginId(request.loginId())
+                .pw(passwordEncoder.encode(request.pw()))
+                .role(UserRole.PENDING)
+                .name(request.name())
+                .phone(request.phone())
+                .email(blankToNull(request.email()))
+                .build());
+        return new SignUpResponse(saved.getId(), saved.getLoginId(), saved.getRole(), null);
+    }
+
+    /**
+     * 역할 미정 사용자가 역할과 소속 회사를 정한다 (한 번만).
+     * 토큰에 역할·회사가 들어 있으므로 새 토큰을 발급해 돌려준다.
+     */
+    @Transactional
+    public LoginResponse selectRole(Long userId, SelectRoleRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(ErrorCode.USER_NOT_FOUND::toException);
         Company company = companyRepository.findById(request.companyId())
                 .orElseThrow(ErrorCode.COMPANY_NOT_FOUND::toException);
         validateRoleAgainstCompany(request.role(), company.getType());
 
-        User user = User.builder()
-                .loginId(request.loginId())
-                .pw(passwordEncoder.encode(request.pw()))
-                .role(request.role())
-                .company(company)
-                .name(request.name())
-                .phone(request.phone())
-                .email(blankToNull(request.email()))
-                .build();
-        User saved = userRepository.save(user);
-        return new SignUpResponse(saved.getId(), saved.getLoginId(), saved.getRole(), company.getId());
+        user.selectRole(request.role(), company);
+        return issueTokens(user);
     }
 
     private static String blankToNull(String value) {
@@ -68,11 +79,14 @@ public class AuthService {
         if (!passwordEncoder.matches(request.pw(), user.getPw())) {
             throw ErrorCode.INVALID_CREDENTIALS.toException();
         }
-        Long companyId = user.getCompany().getId();
-        String accessToken = tokenProvider.createAccessToken(user.getId(), user.getRole(), companyId);
+        return issueTokens(user);
+    }
+
+    private LoginResponse issueTokens(User user) {
+        String accessToken = tokenProvider.createAccessToken(user.getId(), user.getRole(), user.getCompanyId());
         String refreshToken = tokenProvider.createRefreshToken(user.getId());
         refreshTokenStore.save(user.getId(), refreshToken, tokenProvider.getRefreshTokenValidityMs());
-        return new LoginResponse(accessToken, refreshToken, user.getId(), user.getRole(), companyId);
+        return new LoginResponse(accessToken, refreshToken, user.getId(), user.getRole(), user.getCompanyId());
     }
 
     public RefreshResponse refresh(String refreshToken) {
@@ -88,9 +102,7 @@ public class AuthService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ErrorCode.USER_NOT_FOUND.toException());
-        Long companyId = user.getCompany().getId();
-
-        String newAccess = tokenProvider.createAccessToken(user.getId(), user.getRole(), companyId);
+        String newAccess = tokenProvider.createAccessToken(user.getId(), user.getRole(), user.getCompanyId());
         String newRefresh = tokenProvider.createRefreshToken(user.getId());
         refreshTokenStore.save(user.getId(), newRefresh, tokenProvider.getRefreshTokenValidityMs());
         return new RefreshResponse(newAccess, newRefresh);

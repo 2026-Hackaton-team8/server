@@ -19,6 +19,7 @@ import org.study.jibeo.domain.auth.dto.SignUpResponse;
 import org.study.jibeo.domain.company.model.Company;
 import org.study.jibeo.domain.company.model.CompanyType;
 import org.study.jibeo.domain.company.repository.CompanyRepository;
+import org.study.jibeo.domain.user.dto.SelectRoleRequest;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
@@ -67,59 +68,100 @@ class AuthServiceTest {
     class SignUp {
 
         @Test
-        void 성공하면_비밀번호를_암호화해서_저장한다() {
-            Company company = company(1L, CompanyType.USER_COMPANY);
+        void 역할_미정으로_비밀번호를_암호화해서_저장한다() {
             given(userRepository.existsByLoginId("worker1")).willReturn(false);
-            given(companyRepository.findById(1L)).willReturn(Optional.of(company));
             given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 10L));
 
-            SignUpResponse response = authService.signUp(signUp("worker1", UserRole.WORKER, 1L));
+            SignUpResponse response = authService.signUp(signUp("worker1"));
 
             assertThat(response.userId()).isEqualTo(10L);
-            assertThat(response.companyId()).isEqualTo(1L);
+            assertThat(response.role()).isEqualTo(UserRole.PENDING);
+            assertThat(response.companyId()).isNull();
             verify(userRepository).save(org.mockito.ArgumentMatchers.argThat(u ->
-                    !u.getPw().equals("password123") && passwordEncoder.matches("password123", u.getPw())));
+                    u.getRole() == UserRole.PENDING && u.getCompany() == null
+                            && passwordEncoder.matches("password123", u.getPw())));
         }
 
         @Test
         void 아이디가_중복이면_400() {
             given(userRepository.existsByLoginId("worker1")).willReturn(true);
 
-            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 1L)),
+            assertExpected(() -> authService.signUp(signUp("worker1")),
                     HttpStatus.BAD_REQUEST, "이미 사용 중인 아이디입니다.");
-        }
-
-        @Test
-        void 회사가_없으면_400() {
-            given(userRepository.existsByLoginId(anyString())).willReturn(false);
-            given(companyRepository.findById(99L)).willReturn(Optional.empty());
-
-            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 99L)),
-                    HttpStatus.BAD_REQUEST, "존재하지 않는 회사입니다.");
-        }
-
-        @Test
-        void 회사_타입과_역할이_맞지_않으면_400() {
-            given(userRepository.existsByLoginId(anyString())).willReturn(false);
-            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.MAKER_COMPANY)));
-
-            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 1L)),
-                    HttpStatus.BAD_REQUEST, "회사 타입과 역할이 맞지 않습니다.");
-            verify(userRepository, never()).save(any());
         }
 
         @Test
         void 연락처를_함께_저장한다() {
             given(userRepository.existsByLoginId("worker1")).willReturn(false);
-            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.USER_COMPANY)));
             given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 10L));
 
-            authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
-                    "홍길동", "010-1234-5678", "hong@example.com", 1L));
+            authService.signUp(new SignUpRequest("worker1", "password123", "홍길동", "010-1234-5678", "hong@example.com"));
 
             verify(userRepository).save(org.mockito.ArgumentMatchers.argThat(u ->
                     u.getName().equals("홍길동") && u.getPhone().equals("010-1234-5678")
                             && "hong@example.com".equals(u.getEmail())));
+        }
+    }
+
+    @Nested
+    @DisplayName("역할 선택")
+    class SelectRole {
+
+        @Test
+        void 역할과_회사를_정하고_새_토큰을_발급한다() {
+            User user = pendingUser(10L);
+            given(userRepository.findById(10L)).willReturn(Optional.of(user));
+            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.USER_COMPANY)));
+
+            LoginResponse response = authService.selectRole(10L, new SelectRoleRequest(UserRole.WORKER, 1L));
+
+            assertThat(user.getRole()).isEqualTo(UserRole.WORKER);
+            assertThat(user.getCompanyId()).isEqualTo(1L);
+            assertThat(response.role()).isEqualTo(UserRole.WORKER);
+            assertThat(response.companyId()).isEqualTo(1L);
+            var claims = tokenProvider.parse(response.accessToken()).getPayload();
+            assertThat(claims.get("role", String.class)).isEqualTo("WORKER");
+            assertThat(claims.get("companyId", Long.class)).isEqualTo(1L);
+            verify(refreshTokenStore).save(10L, response.refreshToken(), REFRESH_TTL);
+        }
+
+        @Test
+        void 회사가_없으면_400() {
+            given(userRepository.findById(10L)).willReturn(Optional.of(pendingUser(10L)));
+            given(companyRepository.findById(99L)).willReturn(Optional.empty());
+
+            assertExpected(() -> authService.selectRole(10L, new SelectRoleRequest(UserRole.WORKER, 99L)),
+                    HttpStatus.BAD_REQUEST, "존재하지 않는 회사입니다.");
+        }
+
+        @Test
+        void 회사_타입과_역할이_맞지_않으면_400() {
+            User user = pendingUser(10L);
+            given(userRepository.findById(10L)).willReturn(Optional.of(user));
+            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.MAKER_COMPANY)));
+
+            assertExpected(() -> authService.selectRole(10L, new SelectRoleRequest(UserRole.WORKER, 1L)),
+                    HttpStatus.BAD_REQUEST, "회사 타입과 역할이 맞지 않습니다.");
+            assertThat(user.getRole()).isEqualTo(UserRole.PENDING);
+        }
+
+        @Test
+        void PENDING_으로는_바꿀_수_없다() {
+            given(userRepository.findById(10L)).willReturn(Optional.of(pendingUser(10L)));
+            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.USER_COMPANY)));
+
+            assertExpected(() -> authService.selectRole(10L, new SelectRoleRequest(UserRole.PENDING, 1L)),
+                    HttpStatus.BAD_REQUEST, "회사 타입과 역할이 맞지 않습니다.");
+        }
+
+        @Test
+        void 이미_역할이_있으면_409() {
+            given(userRepository.findById(10L)).willReturn(Optional.of(user(10L, "worker1", "password123")));
+            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.USER_COMPANY)));
+
+            assertExpected(() -> authService.selectRole(10L, new SelectRoleRequest(UserRole.WORKER, 1L)),
+                    HttpStatus.CONFLICT, "이미 역할이 정해진 사용자입니다.");
+            verify(refreshTokenStore, never()).save(anyLong(), anyString(), anyLong());
         }
     }
 
@@ -218,8 +260,14 @@ class AuthServiceTest {
         }
     }
 
-    private static SignUpRequest signUp(String loginId, UserRole role, Long companyId) {
-        return new SignUpRequest(loginId, "password123", role, "홍길동", "010-1234-5678", null, companyId);
+    private static SignUpRequest signUp(String loginId) {
+        return new SignUpRequest(loginId, "password123", "홍길동", "010-1234-5678", null);
+    }
+
+    private static User pendingUser(Long id) {
+        return withId(User.builder()
+                .loginId("pending1").pw("x").role(UserRole.PENDING).name("홍길동").phone("010-1234-5678")
+                .build(), id);
     }
 
     private static void assertExpected(org.assertj.core.api.ThrowableAssert.ThrowingCallable call,
