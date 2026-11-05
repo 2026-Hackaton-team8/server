@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.study.jibeo.global.entity.BaseEntity;
 import org.study.jibeo.domain.company.model.Company;
+import org.study.jibeo.global.exception.ErrorCode;
 
 @Getter
 @Entity
@@ -31,8 +32,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "company_id", nullable = false)
+    /** 역할 미정(PENDING)일 때는 null */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
     private Company company;
 
     @Column(nullable = false, length = 50)
@@ -53,6 +55,19 @@ public class User extends BaseEntity {
         this.name = name;
         this.phone = phone;
         this.email = email;
+    }
+
+    /** 역할 미정 상태에서 한 번만 역할과 소속 회사를 정한다 */
+    public void selectRole(UserRole role, Company company) {
+        if (this.role != UserRole.PENDING) {
+            throw ErrorCode.ROLE_ALREADY_SELECTED.toException();
+        }
+        this.role = role;
+        this.company = company;
+    }
+
+    public Long getCompanyId() {
+        return company == null ? null : company.getId();
     }
 
     public void updateContact(String name, String phone, String email) {
