@@ -16,7 +16,9 @@ import org.study.jibeo.domain.company.model.Company;
 import org.study.jibeo.domain.company.model.CompanyType;
 import org.study.jibeo.domain.company.repository.CompanyRepository;
 import org.study.jibeo.domain.equipmentmodel.model.Manual;
+import org.study.jibeo.domain.equipmentmodel.model.ManualSection;
 import org.study.jibeo.domain.equipmentmodel.repository.EquipmentModelRepository;
+import org.study.jibeo.domain.equipmentmodel.repository.ManualSectionRepository;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
@@ -51,6 +53,8 @@ class FoundationApiTest {
     private JwtTokenProvider tokenProvider;
     @Autowired
     private EquipmentModelRepository modelRepository;
+    @Autowired
+    private ManualSectionRepository sectionRepository;
 
     @MockitoBean
     private RefreshTokenStore refreshTokenStore;
@@ -236,13 +240,23 @@ class FoundationApiTest {
                 .andExpect(jsonPath("$.data.sections[0].title").value("개요"))
                 .andExpect(jsonPath("$.data.sections[0].type").value("TROUBLESHOOTING"))
                 .andExpect(jsonPath("$.data.sections[1].title").value("탈수가 안 되고 물이 남을 때"))
+                .andExpect(jsonPath("$.data.sections[1].errorCodes[0]").value("E-07"))
+                .andExpect(jsonPath("$.data.sections[1].causes[0]").value("배수 필터 막힘"))
+                .andExpect(jsonPath("$.data.sections[1].steps.length()").value(2))
+                .andExpect(jsonPath("$.data.sections[1].escalation").value("청소 후에도 물이 남으면 호출합니다."))
+                .andExpect(jsonPath("$.data.sections[1].source").value("세탁기 설명서 고장 대응 표"))
                 .andExpect(jsonPath("$.data.sections[2].title").value("안전 수칙"))
                 .andExpect(jsonPath("$.data.sections[2].type").value("SAFETY"));
 
-        // AI 가 읽는 jsonb 는 기존 항목 형식 그대로
+        // 항목 테이블에도 같은 칸으로 저장된다
+        assertThat(sectionRepository.findAllByEquipmentModelIdOrderBySortOrderAsc(modelId))
+                .extracting(ManualSection::getSectionKey).containsExactly("s-001", "s-002", "s-003");
+
+        // AI 가 읽는 jsonb 는 기존 항목 형식 그대로이고, 조치가 steps 로 들어간다
         Manual saved = modelRepository.findById(modelId).orElseThrow().getManual();
-        assertThat(saved.sections().get(1).content())
-                .isEqualTo("배수 필터가 막히면 물이 빠지지 않습니다.\n\n1. 전원을 끕니다.\n2. 배수 필터를 청소합니다.");
+        assertThat(saved.sections().get(1).steps()).containsExactly("전원을 끕니다.", "배수 필터를 청소합니다.");
+        assertThat(saved.sections().get(1).symptoms()).containsExactly("E-07", "탈수 단계에서 멈추고 물이 남습니다.");
+        assertThat(saved.sections().get(1).cautions()).containsExactly("담당자 호출: 청소 후에도 물이 남으면 호출합니다.");
 
         // 다시 저장하면 버전이 오른다
         mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
@@ -325,10 +339,16 @@ class FoundationApiTest {
             산업용 세탁기 매뉴얼입니다.
 
             ## 탈수가 안 되고 물이 남을 때
-            배수 필터가 막히면 물이 빠지지 않습니다.
-
+            유형: 고장
+            오류 코드: E-07
+            증상: 탈수 단계에서 멈추고 물이 남습니다.
+            가능한 원인:
+            - 배수 필터 막힘
+            조치:
             1. 전원을 끕니다.
             2. 배수 필터를 청소합니다.
+            담당자 호출: 청소 후에도 물이 남으면 호출합니다.
+            근거: 세탁기 설명서 고장 대응 표
 
             ## 안전 수칙
             점검 전 전원을 차단하세요.

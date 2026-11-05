@@ -16,7 +16,9 @@ import org.study.jibeo.domain.equipmentmodel.dto.ModelSummaryResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.PartResponse;
 import org.study.jibeo.domain.equipmentmodel.model.EquipmentModel;
 import org.study.jibeo.domain.equipmentmodel.model.Manual;
+import org.study.jibeo.domain.equipmentmodel.model.ManualSection;
 import org.study.jibeo.domain.equipmentmodel.repository.EquipmentModelRepository;
+import org.study.jibeo.domain.equipmentmodel.repository.ManualSectionRepository;
 import org.study.jibeo.domain.part.model.Part;
 import org.study.jibeo.domain.part.repository.PartRepository;
 import org.study.jibeo.domain.repairhistory.repository.RepairHistoryRepository;
@@ -27,6 +29,7 @@ import org.study.jibeo.global.ai.AiDtos;
 import org.study.jibeo.global.exception.ErrorCode;
 import team.themoment.sdk.exception.ExpectedException;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +44,7 @@ public class EquipmentModelService {
 
     private final EquipmentModelRepository modelRepository;
     private final PartRepository partRepository;
+    private final ManualSectionRepository sectionRepository;
     private final CompanyRepository companyRepository;
     private final EquipmentRepository equipmentRepository;
     private final RepairHistoryRepository repairHistoryRepository;
@@ -134,23 +138,42 @@ public class EquipmentModelService {
 
     public ManualResponse getManual(Long makerCompanyId, Long modelId) {
         EquipmentModel model = findOwnedModel(makerCompanyId, modelId);
-        return ManualResponse.of(model.getManualText(), model.getManual());
+        return ManualResponse.of(model.getManualText(), model.getManual(),
+                sectionRepository.findAllByEquipmentModelIdOrderBySortOrderAsc(modelId));
     }
 
-    /** 전문을 통째로 바꾸고, 제목 기준으로 나눈 항목을 AI 가 다시 색인하게 한다 */
+    /**
+     * 전문을 통째로 바꾼다. 제목·줄 머리표로 나눈 항목을 manual_section 에 다시 저장하고,
+     * AI 가 읽는 jsonb(equipment_model.manual)도 같은 항목으로 채운 뒤 AI 에 다시 색인하게 한다
+     */
     @Transactional
     public ManualResponse updateManual(Long makerCompanyId, Long modelId, String content) {
         EquipmentModel model = findOwnedModel(makerCompanyId, modelId);
-        int version = model.getManual() == null ? 1 : model.getManual().version() + 1;
-        Manual manual;
+        List<ManualParser.Section> parsed;
         try {
-            manual = ManualSplitter.split(content.strip(), version, model.getName() + " 매뉴얼");
+            parsed = ManualParser.parse(content.strip(), model.getName() + " 매뉴얼");
         } catch (IllegalArgumentException e) {
             throw new ExpectedException(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+        int version = model.getManual() == null ? 1 : model.getManual().version() + 1;
+        Manual manual = new Manual(version, parsed.stream().map(ManualParser.Section::toAi).toList());
         model.updateManual(content, manual);
+
+        sectionRepository.deleteAllByModelId(modelId);
+        List<ManualSection> sections = new ArrayList<>();
+        for (int i = 0; i < parsed.size(); i++) {
+            ManualParser.Section s = parsed.get(i);
+            sections.add(ManualSection.builder()
+                    .equipmentModel(model).sectionKey(s.key()).sortOrder(i).type(s.type()).title(s.title())
+                    .errorCodes(s.errorCodes()).symptoms(s.symptoms()).causes(s.causes()).steps(s.steps())
+                    .escalation(s.escalation()).cautions(s.cautions()).source(s.source())
+                    .description(s.description()).content(s.content())
+                    .build());
+        }
+        sectionRepository.saveAll(sections);
+
         aiClient.notifyIndex(AiDtos.IndexKind.MANUAL, model.getId());
-        return ManualResponse.of(content, manual);
+        return ManualResponse.of(content, manual, sections);
     }
 
     /** 다른 제작 업체의 모델은 존재 여부도 드러내지 않도록 404 */
