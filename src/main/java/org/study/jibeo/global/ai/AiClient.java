@@ -44,7 +44,13 @@ public class AiClient {
         if (!properties.enabled()) {
             return stub.next(request);
         }
-        return post(consultationClient, "/ai/consultations/next", request, AiDtos.NextResponse.class);
+        AiDtos.NextResponse res = post(consultationClient, "/ai/consultations/next", request, AiDtos.NextResponse.class);
+        if (res.aiStatus() != null) {
+            // AI 내부 장애(검색·모델 실패)로 호출 권유를 대신 돌려준 경우. 사용자에겐 일반 호출 권유로 보인다
+            log.warn("AI degraded: consultationId={}, aiStatus={}, type={}, reason={}",
+                    request.consultationId(), res.aiStatus(), res.type(), res.reason());
+        }
+        return res;
     }
 
     public AiDtos.DraftResponse draftSolution(AiDtos.DraftRequest request) {

@@ -78,7 +78,7 @@ class ConsultationAiFailureTest {
     @Test
     void 질문_5번을_넘기면_AI가_또_물어도_확신_부족으로_호출을_권한다() throws Exception {
         given(aiClient.next(any())).willReturn(new AiDtos.NextResponse(AiDtos.TurnType.QUESTION, "또 질문",
-                List.of(), List.of(), null, null, null, null, null, null, null, null));
+                List.of(), List.of(), null, null, null, null, null, null, null, null, null));
 
         String json = mockMvc.perform(auth(post("/api/consultations"))
                         .contentType(MediaType.APPLICATION_JSON)

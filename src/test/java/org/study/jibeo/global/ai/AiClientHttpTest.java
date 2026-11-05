@@ -76,6 +76,38 @@ class AiClientHttpTest {
     }
 
     @Test
+    void 실제_AI의_해결책_응답에서_매뉴얼_출처와_aiStatus를_읽는다() {
+        // Python AI 가 실제로 돌려주는 형식 (confidence 없음, 부품 코드 null, 추가 필드 demoOnly)
+        reply.set("""
+                {"type":"SOLUTION","cause":"매뉴얼 관련 항목: 냉각수 부족 (실제 원인 미확인)","suspectedPartCode":null,
+                 "steps":["냉각수 탱크를 채우세요."],"cautions":["권한이 있는 작업자가 수행하세요."],
+                 "evidence":{"manualSectionIds":["cnc-coolant-low"],"repairHistoryIds":[],"solutionId":null,
+                   "manualSources":[{"sectionId":"cnc-coolant-low","title":"냉각수 부족","version":null,
+                                     "originalQuote":"Fill the coolant tank."}]},
+                 "summary":{"symptom":"냉각수 부족","cause":"미확인","triedAction":"확인된 조치 없음"},
+                 "aiStatus":null,"demoOnly":true}
+                """);
+
+        AiDtos.NextResponse res = aiClient.next(new AiDtos.NextRequest(7L,
+                new AiDtos.EquipmentInfo(1L, "1호기", "1층"), new AiDtos.ModelInfo(2L, "CNC-001", "CNC 가공기", "CNC 가공기"),
+                "냉각수", 0, 5, List.of(new AiDtos.Message("USER", "SYMPTOM", "냉각수"))));
+
+        assertThat(res.type()).isEqualTo(AiDtos.TurnType.SOLUTION);
+        assertThat(res.confidence()).isNull();
+        assertThat(res.evidence().manualSources()).singleElement()
+                .satisfies(s -> assertThat(s).containsEntry("originalQuote", "Fill the coolant tank."));
+
+        reply.set("""
+                {"type":"ESCALATE","reason":"LOW_CONFIDENCE","cause":"원인 미확인","suspectedPartCode":null,
+                 "summary":{"symptom":"s","cause":"미확인","triedAction":"없음"},"aiStatus":"RETRIEVAL_UNAVAILABLE"}
+                """);
+        assertThat(aiClient.next(new AiDtos.NextRequest(7L,
+                new AiDtos.EquipmentInfo(1L, "1호기", "1층"), new AiDtos.ModelInfo(2L, "CNC-001", "CNC 가공기", "CNC 가공기"),
+                "냉각수", 0, 5, List.of(new AiDtos.Message("USER", "SYMPTOM", "냉각수")))).aiStatus())
+                .isEqualTo("RETRIEVAL_UNAVAILABLE");
+    }
+
+    @Test
     void 초안_요청의_수리일은_날짜_문자열로_보낸다() {
         reply.set("""
                 {"title":"t","category":"c","symptoms":["s"],"steps":["1"],"fallback":"f","evidenceRepairHistoryIds":[41]}

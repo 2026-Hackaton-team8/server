@@ -108,6 +108,7 @@ class ConsultationApiTest {
                 .andExpect(jsonPath("$.data.messages[5].type").value("SOLUTION"))
                 .andExpect(jsonPath("$.data.messages[5].payload.steps[1]").value("배수 필터를 청소합니다."))
                 .andExpect(jsonPath("$.data.messages[5].payload.evidence.manualSectionIds[0]").value("drain-not-working"))
+                .andExpect(jsonPath("$.data.messages[5].payload.evidence.manualSources[0].sectionId").value("drain-not-working"))
                 .andExpect(jsonPath("$.data.aiCause").value("배수 필터 막힘"))
                 .andExpect(jsonPath("$.data.suspectedPart.meshName").value("drain_filter"))
                 .andExpect(jsonPath("$.data.canAnswer").value(false))

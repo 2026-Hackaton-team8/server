@@ -107,9 +107,6 @@ public class SolutionService {
     public SolutionDetailResponse update(Long makerCompanyId, Long solutionId, UpdateSolutionRequest body) {
         Solution solution = findOwned(makerCompanyId, solutionId);
         solution.update(body.title(), body.category(), body.symptoms(), body.steps(), body.fallback());
-        if (solution.getStatus() == SolutionStatus.APPROVED) {
-            aiClient.notifyIndex(AiDtos.IndexKind.SOLUTION, solution.getId());
-        }
         return SolutionDetailResponse.from(solution);
     }
 
@@ -117,7 +114,6 @@ public class SolutionService {
     public SolutionDetailResponse approve(Long makerCompanyId, Long userId, Long solutionId) {
         Solution solution = findOwned(makerCompanyId, solutionId);
         solution.approve(userRepository.getReferenceById(userId));
-        aiClient.notifyIndex(AiDtos.IndexKind.SOLUTION, solution.getId());
         return SolutionDetailResponse.from(solution);
     }
 
@@ -125,7 +121,6 @@ public class SolutionService {
     public SolutionDetailResponse withdraw(Long makerCompanyId, Long solutionId) {
         Solution solution = findOwned(makerCompanyId, solutionId);
         solution.withdraw();
-        aiClient.notifyIndex(AiDtos.IndexKind.SOLUTION, solution.getId());
         return SolutionDetailResponse.from(solution);
     }
 
