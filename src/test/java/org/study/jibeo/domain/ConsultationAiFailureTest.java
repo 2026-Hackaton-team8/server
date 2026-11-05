@@ -18,6 +18,9 @@ import org.study.jibeo.domain.company.repository.CompanyRepository;
 import org.study.jibeo.domain.equipment.model.Equipment;
 import org.study.jibeo.domain.equipment.repository.EquipmentRepository;
 import org.study.jibeo.domain.equipmentmodel.model.EquipmentModel;
+import org.study.jibeo.domain.equipmentmodel.model.Manual;
+import org.study.jibeo.domain.equipmentmodel.model.ManualSection;
+import org.study.jibeo.domain.part.model.Part;
 import org.study.jibeo.domain.equipmentmodel.repository.EquipmentModelRepository;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
@@ -53,6 +56,10 @@ class ConsultationAiFailureTest {
     private EquipmentRepository equipmentRepository;
     @Autowired
     private JwtTokenProvider tokenProvider;
+    @Autowired
+    private org.study.jibeo.domain.part.repository.PartRepository partRepository;
+    @Autowired
+    private org.study.jibeo.domain.equipmentmodel.repository.ManualSectionRepository manualSectionRepository;
 
     @MockitoBean
     private RefreshTokenStore refreshTokenStore;
@@ -93,6 +100,31 @@ class ConsultationAiFailureTest {
                 .andExpect(jsonPath("$.data.messages[-1].type").value("ESCALATE"))
                 .andExpect(jsonPath("$.data.messages[-1].payload.reason").value("LOW_CONFIDENCE"))
                 .andExpect(jsonPath("$.data.canAnswer").value(false));
+    }
+
+    @Test
+    void 해결책이_근거로_든_매뉴얼_항목의_부품을_3D용으로_함께_돌려준다() throws Exception {
+        EquipmentModel model = equipmentRepository.findById(equipmentId).orElseThrow().getEquipmentModel();
+        partRepository.save(Part.builder().equipmentModel(model).code("WM-20:FILTER").name("배수 필터").build());
+        partRepository.save(Part.builder().equipmentModel(model).code("WM-20:PUMP").name("배수 펌프").build());
+        manualSectionRepository.save(ManualSection.builder().equipmentModel(model).sectionKey("s-004").sortOrder(3)
+                .type(Manual.SectionType.TROUBLESHOOTING).title("고장: 물이 안 빠져요")
+                .partCodes(List.of("WM-20:PUMP", "WM-20:FILTER", "WM-20:UNKNOWN")).content("배수 필터를 확인합니다.")
+                .build());
+        // 실제 AI 처럼 부품 코드는 null, 근거 항목 id 만 준다
+        given(aiClient.next(any())).willReturn(new AiDtos.NextResponse(AiDtos.TurnType.SOLUTION, null, null, null,
+                "매뉴얼 관련 항목: 고장: 물이 안 빠져요 (실제 원인 미확인)", null, null, List.of("배수 필터를 확인합니다."),
+                List.of(), new AiDtos.Evidence(List.of("s-004"), List.of(), null, List.of()), null, null, null));
+
+        mockMvc.perform(auth(post("/api/consultations"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipmentId\":%d,\"symptom\":\"물이 안 빠져요\"}".formatted(equipmentId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.suspectedPart.code").value("WM-20:PUMP"))
+                .andExpect(jsonPath("$.data.messages[-1].type").value("SOLUTION"))
+                .andExpect(jsonPath("$.data.messages[-1].payload.parts.length()").value(2))
+                .andExpect(jsonPath("$.data.messages[-1].payload.parts[0].code").value("WM-20:PUMP"))
+                .andExpect(jsonPath("$.data.messages[-1].payload.parts[1].name").value("배수 필터"));
     }
 
     @Test

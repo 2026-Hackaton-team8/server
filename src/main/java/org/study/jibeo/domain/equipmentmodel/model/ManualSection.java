@@ -52,6 +52,11 @@ public class ManualSection extends BaseEntity {
     @Column(name = "error_codes")
     private List<String> errorCodes;
 
+    /** 관련 부품 코드 (해결책을 줄 때 3D 모델에서 짚을 부품) */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "part_codes")
+    private List<String> partCodes;
+
     @JdbcTypeCode(SqlTypes.JSON)
     private List<String> symptoms;
 
@@ -83,7 +88,7 @@ public class ManualSection extends BaseEntity {
 
     @Builder
     private ManualSection(EquipmentModel equipmentModel, String sectionKey, int sortOrder, Manual.SectionType type,
-                          String title, List<String> errorCodes, List<String> symptoms, List<String> causes,
+                          String title, List<String> errorCodes, List<String> partCodes, List<String> symptoms, List<String> causes,
                           List<String> steps, String escalation, List<String> cautions, String source,
                           String description, String content) {
         this.equipmentModel = equipmentModel;
@@ -92,6 +97,7 @@ public class ManualSection extends BaseEntity {
         this.type = type;
         this.title = title;
         this.errorCodes = errorCodes;
+        this.partCodes = partCodes;
         this.symptoms = symptoms;
         this.causes = causes;
         this.steps = steps;

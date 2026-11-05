@@ -7,10 +7,13 @@ import org.springframework.data.repository.query.Param;
 import org.study.jibeo.domain.equipmentmodel.model.ManualSection;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ManualSectionRepository extends JpaRepository<ManualSection, Long> {
 
     List<ManualSection> findAllByEquipmentModelIdOrderBySortOrderAsc(Long equipmentModelId);
+
+    Optional<ManualSection> findByEquipmentModelIdAndSectionKey(Long equipmentModelId, String sectionKey);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM ManualSection s WHERE s.equipmentModel.id = :modelId")
