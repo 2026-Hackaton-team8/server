@@ -158,6 +158,22 @@ class AuthApiTest {
                 .andExpect(jsonPath("$.security[0].bearerAuth").exists());
     }
 
+    @Test
+    void Swagger_문서의_모든_API에_한글_요약이_있다() throws Exception {
+        String json = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/auth/signup'].post.summary").value("회원가입"))
+                .andExpect(jsonPath("$.paths['/api/auth/login'].post.tags[0]").value("인증"))
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.List<String> operations = JsonPath.read(json, "$.paths.*.*.operationId");
+        java.util.List<String> summaries = JsonPath.read(json, "$.paths.*.*.summary");
+        org.assertj.core.api.Assertions.assertThat(summaries)
+                .as("summary 가 없는 API가 있습니다. 컨트롤러 메서드에 @Operation(summary = ...) 를 붙이세요.")
+                .hasSameSizeAs(operations)
+                .allMatch(s -> s.codePoints().anyMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HANGUL));
+    }
+
     private Long company(String name, String businessNumber, CompanyType type) {
         return companyRepository.save(Company.builder()
                 .name(name).located("광주").businessNumber(businessNumber).type(type).phone("062-123-4567")

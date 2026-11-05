@@ -1,5 +1,7 @@
 package org.study.jibeo.domain.request.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +26,7 @@ import java.util.List;
 
 /** 제작 업체(STAFF) 전용: 호출 수신함·호출 상세·엔지니어 배정 */
 @Validated
+@Tag(name = "호출 수신함 (제작 업체)")
 @RestController
 @RequestMapping("/api/maker")
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class MakerRequestController {
     private final RequestService requestService;
 
     /** 호출 수신함 + 탭별 개수 */
+    @Operation(summary = "호출 수신함")
     @GetMapping("/requests")
     public InboxResponse getInbox(@RequestParam(required = false) RequestStatus status,
                                   @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -39,24 +43,28 @@ public class MakerRequestController {
         return requestService.getInbox(CurrentUser.companyId(), status, page, size);
     }
 
+    @Operation(summary = "호출 상세")
     @GetMapping("/requests/{requestId}")
     public RequestDetailResponse getRequest(@PathVariable Long requestId) {
         return requestService.getReceived(CurrentUser.companyId(), requestId);
     }
 
     /** 엔지니어 배정·재배정 → ASSIGNED */
+    @Operation(summary = "엔지니어 배정")
     @PostMapping("/requests/{requestId}/assign")
     public RequestDetailResponse assign(@PathVariable Long requestId, @Valid @RequestBody AssignRequest request) {
         return requestService.assign(CurrentUser.companyId(), requestId, request);
     }
 
     /** 자가 해결로 종료 → SELF_RESOLVED */
+    @Operation(summary = "자가 해결 처리")
     @PostMapping("/requests/{requestId}/self-resolved")
     public RequestDetailResponse resolveBySelf(@PathVariable Long requestId) {
         return requestService.resolveBySelf(CurrentUser.companyId(), requestId);
     }
 
     /** 배정할 수 있는 엔지니어 (우리 회사 STAFF) */
+    @Operation(summary = "엔지니어 목록")
     @GetMapping("/engineers")
     public List<EngineerResponse> getEngineers() {
         return requestService.getEngineers(CurrentUser.companyId());
