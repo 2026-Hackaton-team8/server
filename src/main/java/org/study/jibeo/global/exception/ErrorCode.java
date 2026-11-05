@@ -17,7 +17,10 @@ public enum ErrorCode {
     MODEL_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 모델입니다."),
     DUPLICATE_MODEL_CODE(HttpStatus.CONFLICT, "이미 등록된 모델 코드입니다."),
     DUPLICATE_PART_CODE(HttpStatus.CONFLICT, "이 모델에 이미 등록된 부품 코드입니다."),
-    EQUIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 설비입니다.");
+    EQUIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 설비입니다."),
+    REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 호출입니다."),
+    INVALID_REQUEST_STATUS(HttpStatus.CONFLICT, "이미 종료된 호출입니다."),
+    ENGINEER_NOT_FOUND(HttpStatus.BAD_REQUEST, "배정할 수 없는 엔지니어입니다.");
 
     private final HttpStatus status;
     private final String message;
