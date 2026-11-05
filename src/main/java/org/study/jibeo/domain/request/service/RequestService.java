@@ -29,6 +29,7 @@ import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.exception.ErrorCode;
 import org.study.jibeo.global.storage.FileStorage;
+import org.study.jibeo.global.storage.FileViewUrls;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -45,6 +46,7 @@ public class RequestService {
     private final UserRepository userRepository;
     private final RequestAttachmentRepository attachmentRepository;
     private final FileStorage fileStorage;
+    private final FileViewUrls fileViewUrls;
     private final ConsultationRepository consultationRepository;
     private final ConsultationService consultationService;
 
@@ -180,7 +182,7 @@ public class RequestService {
         List<RequestDetailResponse.Attachment> attachments = attachmentRepository
                 .findAllByRequestIdOrderByIdAsc(request.getId()).stream()
                 .map(a -> new RequestDetailResponse.Attachment(a.getFileKey(), a.getContentType(), a.getSize(),
-                        fileStorage.viewUrl(a.getFileKey())))
+                        fileViewUrls.urlOf(a.getFileKey())))
                 .toList();
         return RequestDetailResponse.of(request, attachments);
     }

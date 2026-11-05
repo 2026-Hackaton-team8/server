@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.study.jibeo.domain.file.dto.FileUploadResponse;
 import org.study.jibeo.global.exception.ErrorCode;
 import org.study.jibeo.global.storage.FileStorage;
+import org.study.jibeo.global.storage.FileViewUrls;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,6 +35,7 @@ public class FileService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final FileStorage fileStorage;
+    private final FileViewUrls fileViewUrls;
 
     /** 이 회사가 올린 호출 첨부 파일의 키 접두어 */
     public static String requestAttachmentPrefix(Long companyId) {
@@ -59,6 +61,17 @@ public class FileService {
         } catch (IOException e) {
             throw ErrorCode.UNREADABLE_FILE.toException();
         }
-        return new FileUploadResponse(key, contentType, file.getSize(), fileStorage.viewUrl(key));
+        return new FileUploadResponse(key, contentType, file.getSize(), fileViewUrls.urlOf(key));
+    }
+
+    /** 서명된 보기 주소로 S3 의 파일을 연다. 남은 유효 시간은 캐시 시간으로 쓴다 */
+    public FileView open(String key, long exp, String sig, String range) {
+        long maxAgeSeconds = fileViewUrls.verify(key, exp, sig);
+        FileStorage.FileStream stream = fileStorage.open(key, range)
+                .orElseThrow(ErrorCode.FILE_NOT_FOUND::toException);
+        return new FileView(stream, maxAgeSeconds);
+    }
+
+    public record FileView(FileStorage.FileStream stream, long maxAgeSeconds) {
     }
 }
