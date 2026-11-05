@@ -23,7 +23,6 @@ import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.config.jwt.JwtProperties;
-import org.study.jibeo.global.exception.ErrorCode;
 import org.study.jibeo.global.config.jwt.JwtTokenProvider;
 import team.themoment.sdk.exception.ExpectedException;
 
@@ -110,46 +109,17 @@ class AuthServiceTest {
         }
 
         @Test
-        void 새_회사를_함께_등록할_수_있다() {
-            given(userRepository.existsByLoginId("maker1")).willReturn(false);
-            given(companyRepository.existsByBusinessNumber("999-99-99999")).willReturn(false);
-            given(companyRepository.save(any(Company.class))).willAnswer(inv -> withId(inv.getArgument(0), 5L));
-            given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 11L));
+        void 연락처를_함께_저장한다() {
+            given(userRepository.existsByLoginId("worker1")).willReturn(false);
+            given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.USER_COMPANY)));
+            given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 10L));
 
-            SignUpResponse response = authService.signUp(new SignUpRequest("maker1", "password123", UserRole.STAFF,
-                    "홍길동", "010-1234-5678", null, null, newCompany(CompanyType.MAKER_COMPANY)));
+            authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
+                    "홍길동", "010-1234-5678", "hong@example.com", 1L));
 
-            assertThat(response.companyId()).isEqualTo(5L);
-            verify(companyRepository).save(org.mockito.ArgumentMatchers.argThat(c ->
-                    c.getType() == CompanyType.MAKER_COMPANY && c.getPhone().equals("062-000-0000")));
-        }
-
-        @Test
-        void 회사를_선택도_등록도_안하면_400() {
-            given(userRepository.existsByLoginId(anyString())).willReturn(false);
-
-            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, null)),
-                    HttpStatus.BAD_REQUEST, ErrorCode.COMPANY_CHOICE_REQUIRED.getMessage());
-        }
-
-        @Test
-        void 회사를_선택과_등록_둘_다_하면_400() {
-            given(userRepository.existsByLoginId(anyString())).willReturn(false);
-
-            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
-                            "홍길동", "010-1234-5678", null, 1L, newCompany(CompanyType.USER_COMPANY))),
-                    HttpStatus.BAD_REQUEST, ErrorCode.COMPANY_CHOICE_REQUIRED.getMessage());
-        }
-
-        @Test
-        void 이미_등록된_사업자번호면_409() {
-            given(userRepository.existsByLoginId(anyString())).willReturn(false);
-            given(companyRepository.existsByBusinessNumber("999-99-99999")).willReturn(true);
-
-            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
-                            "홍길동", "010-1234-5678", null, null, newCompany(CompanyType.USER_COMPANY))),
-                    HttpStatus.CONFLICT, ErrorCode.DUPLICATE_BUSINESS_NUMBER.getMessage());
-            verify(companyRepository, never()).save(any());
+            verify(userRepository).save(org.mockito.ArgumentMatchers.argThat(u ->
+                    u.getName().equals("홍길동") && u.getPhone().equals("010-1234-5678")
+                            && "hong@example.com".equals(u.getEmail())));
         }
     }
 
@@ -249,11 +219,7 @@ class AuthServiceTest {
     }
 
     private static SignUpRequest signUp(String loginId, UserRole role, Long companyId) {
-        return new SignUpRequest(loginId, "password123", role, "홍길동", "010-1234-5678", null, companyId, null);
-    }
-
-    private static SignUpRequest.NewCompany newCompany(CompanyType type) {
-        return new SignUpRequest.NewCompany("새 회사", "광주", "999-99-99999", type, "062-000-0000", null);
+        return new SignUpRequest(loginId, "password123", role, "홍길동", "010-1234-5678", null, companyId);
     }
 
     private static void assertExpected(org.assertj.core.api.ThrowableAssert.ThrowingCallable call,

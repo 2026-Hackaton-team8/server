@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/companies").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/companies").permitAll()
                         .requestMatchers("/api/maker/**").hasRole("STAFF")
                         .requestMatchers("/api/equipments/**").hasRole("WORKER")
                         .anyRequest().authenticated())

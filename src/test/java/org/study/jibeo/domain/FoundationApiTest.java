@@ -75,6 +75,47 @@ class FoundationApiTest {
     }
 
     @Test
+    void 회사를_먼저_등록하고_그_회사로_회원가입한다() throws Exception {
+        long companyId = idOf(mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"새 사용 업체","located":"광주","businessNumber":"300-00-00001",
+                                 "type":"USER_COMPANY","phone":"062-555-6666"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("새 사용 업체"))
+                .andReturn().getResponse().getContentAsString());
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"loginId":"newworker","pw":"password123","role":"WORKER",
+                                 "name":"새담당","phone":"010-5555-6666","companyId":%d}
+                                """.formatted(companyId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyId").value(companyId));
+
+        // 같은 사업자등록번호는 다시 등록할 수 없다
+        mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"중복","located":"광주","businessNumber":"300-00-00001",
+                                 "type":"USER_COMPANY","phone":"062-555-6666"}
+                                """))
+                .andExpect(status().isConflict());
+
+        // 회사 없이는 가입할 수 없다
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"loginId":"nocompany","pw":"password123","role":"WORKER",
+                                 "name":"홍길동","phone":"010-1234-5678"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data[0].field").value("companyId"));
+    }
+
+    @Test
     void 내_정보를_조회하고_연락처를_수정한다() throws Exception {
         mockMvc.perform(auth(get("/api/me"), workerToken))
                 .andExpect(status().isOk())
