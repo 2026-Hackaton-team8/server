@@ -1,5 +1,7 @@
 package org.study.jibeo.domain.company.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,7 @@ import org.study.jibeo.domain.company.service.CompanyService;
 import java.util.List;
 
 /** 회원가입 전에 쓰므로 로그인 없이 공개 */
+@Tag(name = "회사")
 @RestController
 @RequestMapping("/api/companies")
 @RequiredArgsConstructor
@@ -24,12 +27,14 @@ public class CompanyController {
     private final CompanyService companyService;
 
     /** 회원가입 화면의 회사 선택 목록 */
+    @Operation(summary = "회사 목록")
     @GetMapping
     public List<CompanyResponse> findAll(@RequestParam(required = false) CompanyType type) {
         return companyService.findAll(type);
     }
 
     /** 소속 회사 등록. 등록 후 받은 id 로 회원가입한다 */
+    @Operation(summary = "회사 등록")
     @PostMapping
     public CompanyResponse create(@Valid @RequestBody CreateCompanyRequest request) {
         return companyService.create(request);
