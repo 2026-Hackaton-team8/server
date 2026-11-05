@@ -90,6 +90,9 @@ class ManualParserTest {
         assertThat(sections).extracting(ManualParser.Section::type).containsExactly(
                 Manual.SectionType.OVERVIEW, Manual.SectionType.OPERATION, Manual.SectionType.MAINTENANCE,
                 Manual.SectionType.SAFETY, Manual.SectionType.SAFETY, Manual.SectionType.TROUBLESHOOTING);
+        // 유형 줄은 원문(AI 가 주의사항에 붙이는 내용)에서 빠진다
+        assertThat(sections.get(0).content()).isEqualTo("6축 로봇입니다.");
+        assertThat(sections).allSatisfy(s -> assertThat(s.content()).doesNotContain("유형:"));
     }
 
     @Test
