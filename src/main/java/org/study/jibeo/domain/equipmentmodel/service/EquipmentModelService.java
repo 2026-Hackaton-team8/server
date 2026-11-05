@@ -10,6 +10,7 @@ import org.study.jibeo.domain.equipment.repository.EquipmentRepository;
 import org.study.jibeo.domain.equipmentmodel.dto.CreateModelRequest;
 import org.study.jibeo.domain.equipmentmodel.dto.CreatePartRequest;
 import org.study.jibeo.domain.equipmentmodel.dto.MakerModelResponse;
+import org.study.jibeo.domain.equipmentmodel.dto.ManualResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.ModelDetailResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.ModelSummaryResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.PartResponse;
@@ -28,10 +29,8 @@ import team.themoment.sdk.exception.ExpectedException;
 
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -133,18 +132,25 @@ public class EquipmentModelService {
         return PartResponse.from(part);
     }
 
-    public Manual getManual(Long makerCompanyId, Long modelId) {
-        Manual manual = findOwnedModel(makerCompanyId, modelId).getManual();
-        return manual != null ? manual : new Manual(1, List.of());
+    public ManualResponse getManual(Long makerCompanyId, Long modelId) {
+        EquipmentModel model = findOwnedModel(makerCompanyId, modelId);
+        return ManualResponse.of(model.getManualText(), model.getManual());
     }
 
+    /** 전문을 통째로 바꾸고, 제목 기준으로 나눈 항목을 AI 가 다시 색인하게 한다 */
     @Transactional
-    public Manual updateManual(Long makerCompanyId, Long modelId, Manual manual) {
+    public ManualResponse updateManual(Long makerCompanyId, Long modelId, String content) {
         EquipmentModel model = findOwnedModel(makerCompanyId, modelId);
-        validateManual(modelId, manual);
-        model.updateManual(manual);
+        int version = model.getManual() == null ? 1 : model.getManual().version() + 1;
+        Manual manual;
+        try {
+            manual = ManualSplitter.split(content.strip(), version, model.getName() + " 매뉴얼");
+        } catch (IllegalArgumentException e) {
+            throw new ExpectedException(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+        model.updateManual(content, manual);
         aiClient.notifyIndex(AiDtos.IndexKind.MANUAL, model.getId());
-        return manual;
+        return ManualResponse.of(content, manual);
     }
 
     /** 다른 제작 업체의 모델은 존재 여부도 드러내지 않도록 404 */
@@ -155,32 +161,5 @@ public class EquipmentModelService {
             throw ErrorCode.MODEL_NOT_FOUND.toException();
         }
         return model;
-    }
-
-    /** 섹션 id 중복과, partCodes 가 이 모델에 등록된 부품인지 검사 */
-    private void validateManual(Long modelId, Manual manual) {
-        Set<String> ids = new HashSet<>();
-        for (Manual.Section section : manual.sections()) {
-            if (!ids.add(section.id())) {
-                throw badManual("섹션 id가 중복됩니다: " + section.id());
-            }
-        }
-        Set<String> partCodes = partRepository.findAllByEquipmentModelIdOrderByCodeAsc(modelId).stream()
-                .map(Part::getCode)
-                .collect(Collectors.toSet());
-        for (Manual.Section section : manual.sections()) {
-            if (section.partCodes() == null) {
-                continue;
-            }
-            for (String code : section.partCodes()) {
-                if (!partCodes.contains(code)) {
-                    throw badManual("섹션 '" + section.id() + "'의 부품 코드 " + code + "가 이 모델에 등록되어 있지 않습니다.");
-                }
-            }
-        }
-    }
-
-    private static ExpectedException badManual(String message) {
-        return new ExpectedException(message, HttpStatus.BAD_REQUEST);
     }
 }

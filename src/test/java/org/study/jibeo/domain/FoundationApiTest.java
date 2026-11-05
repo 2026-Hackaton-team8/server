@@ -15,11 +15,16 @@ import org.study.jibeo.domain.auth.RefreshTokenStore;
 import org.study.jibeo.domain.company.model.Company;
 import org.study.jibeo.domain.company.model.CompanyType;
 import org.study.jibeo.domain.company.repository.CompanyRepository;
+import org.study.jibeo.domain.equipmentmodel.model.Manual;
+import org.study.jibeo.domain.equipmentmodel.repository.EquipmentModelRepository;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.config.jwt.JwtTokenProvider;
 
+import tools.jackson.databind.json.JsonMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -44,6 +49,8 @@ class FoundationApiTest {
     private UserRepository userRepository;
     @Autowired
     private JwtTokenProvider tokenProvider;
+    @Autowired
+    private EquipmentModelRepository modelRepository;
 
     @MockitoBean
     private RefreshTokenStore refreshTokenStore;
@@ -164,13 +171,15 @@ class FoundationApiTest {
 
         mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(manual("drain-not-working", "P-07")))
+                        .content(manual(MANUAL)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sections[0].id").value("drain-not-working"));
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.sections.length()").value(3));
 
         mockMvc.perform(auth(get("/api/maker/models/" + modelId + "/manual"), makerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sections[0].partCodes[0]").value("P-07"));
+                .andExpect(jsonPath("$.data.content").value(MANUAL))
+                .andExpect(jsonPath("$.data.sections[1].title").value("탈수가 안 되고 물이 남을 때"));
 
         // 사용 업체: 모델 검색 → 상세 → 설비 등록 → 목록
         mockMvc.perform(auth(get("/api/models").param("q", "wm-2"), workerToken))
@@ -210,32 +219,51 @@ class FoundationApiTest {
     }
 
     @Test
-    void 매뉴얼은_등록된_부품_코드와_중복없는_섹션_id만_허용한다() throws Exception {
+    void 매뉴얼_전문을_제목_기준으로_나눠_AI_검색_항목으로_저장한다() throws Exception {
         long modelId = createModel("WM-35");
 
-        mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(manual("drain-not-working", "P-99")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("P-99")));
+        mockMvc.perform(auth(get("/api/maker/models/" + modelId + "/manual"), makerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").doesNotExist())
+                .andExpect(jsonPath("$.data.version").value(0))
+                .andExpect(jsonPath("$.data.sections.length()").value(0));
 
         mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"version":1,"sections":[
-                                  {"id":"a","title":"A","type":"OVERVIEW","content":"x"},
-                                  {"id":"a","title":"B","type":"OVERVIEW","content":"y"}]}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("중복")));
+                        .content(manual(MANUAL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sections[0].id").value("s-001"))
+                .andExpect(jsonPath("$.data.sections[0].title").value("개요"))
+                .andExpect(jsonPath("$.data.sections[0].type").value("TROUBLESHOOTING"))
+                .andExpect(jsonPath("$.data.sections[1].title").value("탈수가 안 되고 물이 남을 때"))
+                .andExpect(jsonPath("$.data.sections[2].title").value("안전 수칙"))
+                .andExpect(jsonPath("$.data.sections[2].type").value("SAFETY"));
+
+        // AI 가 읽는 jsonb 는 기존 항목 형식 그대로
+        Manual saved = modelRepository.findById(modelId).orElseThrow().getManual();
+        assertThat(saved.sections().get(1).content())
+                .isEqualTo("배수 필터가 막히면 물이 빠지지 않습니다.\n\n1. 전원을 끕니다.\n2. 배수 필터를 청소합니다.");
+
+        // 다시 저장하면 버전이 오른다
+        mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(manual("제목 없이 쓴 매뉴얼입니다.")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.sections[0].title").value("모델 매뉴얼"));
 
         mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"version":1,"sections":[{"id":"Bad Id","title":"","type":"OVERVIEW","content":"x"}]}
-                                """))
+                        .content(manual("  ")))
+                .andExpect(status().isBadRequest());
+
+        String tooMany = java.util.stream.IntStream.rangeClosed(1, 201)
+                .mapToObj(i -> "# 항목 " + i + "\n내용").collect(java.util.stream.Collectors.joining("\n"));
+        mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(manual(tooMany)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("요청 값이 유효하지 않습니다."));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("201개")));
     }
 
     @Test
@@ -254,7 +282,7 @@ class FoundationApiTest {
     }
 
     @Test
-    void 모델_코드가_붙은_긴_부품_코드도_등록하고_매뉴얼에서_쓸_수_있다() throws Exception {
+    void 모델_코드가_붙은_긴_부품_코드도_등록할_수_있다() throws Exception {
         long modelId = createModel("COMPRESSOR-001");
 
         mockMvc.perform(auth(post("/api/maker/models/" + modelId + "/parts"), makerToken)
@@ -264,11 +292,6 @@ class FoundationApiTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.code").value("COMPRESSOR-001:PRESSURE_GAUGE"));
-
-        mockMvc.perform(auth(put("/api/maker/models/" + modelId + "/manual"), makerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(manual("pressure-low", "COMPRESSOR-001:PRESSURE_GAUGE")))
-                .andExpect(status().isOk());
 
         mockMvc.perform(auth(post("/api/maker/models/" + modelId + "/parts"), makerToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -298,14 +321,21 @@ class FoundationApiTest {
                 .andReturn().getResponse().getContentAsString());
     }
 
-    private static String manual(String sectionId, String partCode) {
-        return """
-                {"version":1,"sections":[{
-                  "id":"%s","title":"탈수가 안 되고 물이 남을 때","type":"TROUBLESHOOTING",
-                  "symptoms":["탈수 안 됨"],"partCodes":["%s"],
-                  "content":"배수 필터가 막히면 물이 빠지지 않습니다.",
-                  "steps":["전원을 끕니다.","배수 필터를 청소합니다."],"cautions":["전원을 차단하세요."]}]}
-                """.formatted(sectionId, partCode);
+    private static final String MANUAL = """
+            산업용 세탁기 매뉴얼입니다.
+
+            ## 탈수가 안 되고 물이 남을 때
+            배수 필터가 막히면 물이 빠지지 않습니다.
+
+            1. 전원을 끕니다.
+            2. 배수 필터를 청소합니다.
+
+            ## 안전 수칙
+            점검 전 전원을 차단하세요.
+            """;
+
+    private static String manual(String content) {
+        return JsonMapper.builder().build().writeValueAsString(java.util.Map.of("content", content));
     }
 
     private static long idOf(String json) {

@@ -81,7 +81,7 @@ class ConsultationApiTest {
                 .code("WM-20").name("산업용 세탁기").category("세탁기").makerCompany(maker).build());
         partRepository.save(Part.builder().equipmentModel(model).code("P-07").name("배수 필터")
                 .meshName("drain_filter").build());
-        model.updateManual(new Manual(1, List.of(new Manual.Section("drain-not-working", "배수 필터 막힘",
+        model.updateManual(null, new Manual(1, List.of(new Manual.Section("drain-not-working", "배수 필터 막힘",
                 Manual.SectionType.TROUBLESHOOTING, List.of("탈수 안 됨"), List.of("P-07"),
                 "배수 필터가 막히면 물이 빠지지 않습니다.", List.of("전원을 끕니다.", "배수 필터를 청소합니다."),
                 List.of("물이 쏟아질 수 있어요.")))));

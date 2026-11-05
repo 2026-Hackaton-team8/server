@@ -42,7 +42,14 @@ public class EquipmentModel extends BaseEntity {
     @Column(name = "model_file_key", length = 255)
     private String modelFileKey;
 
-    /** 제작 업체가 사이트에서 직접 입력한 매뉴얼. PostgreSQL 에서는 jsonb 컬럼 */
+    /** 제작 업체가 입력한 매뉴얼 전문 (마크다운) */
+    @Column(name = "manual_text", columnDefinition = "text")
+    private String manualText;
+
+    /**
+     * 전문을 제목 기준으로 나눈 AI 검색 항목 (jsonb). Python AI 가 이 컬럼을 직접 읽어 색인하므로 형식을 유지한다.
+     * 전문 없이 항목만 있는 예전 데이터도 있다
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     private Manual manual;
 
@@ -55,7 +62,8 @@ public class EquipmentModel extends BaseEntity {
         this.modelFileKey = modelFileKey;
     }
 
-    public void updateManual(Manual manual) {
+    public void updateManual(String manualText, Manual manual) {
+        this.manualText = manualText;
         this.manual = manual;
     }
 
