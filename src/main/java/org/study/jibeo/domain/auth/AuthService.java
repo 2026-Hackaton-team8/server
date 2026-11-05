@@ -42,7 +42,7 @@ public class AuthService {
             throw ErrorCode.DUPLICATE_LOGIN_ID.toException();
         }
         Company company = companyRepository.findById(request.companyId())
-                .orElseThrow(() -> ErrorCode.COMPANY_NOT_FOUND.toException());
+                .orElseThrow(ErrorCode.COMPANY_NOT_FOUND::toException);
         validateRoleAgainstCompany(request.role(), company.getType());
 
         User user = User.builder()
@@ -50,9 +50,16 @@ public class AuthService {
                 .pw(passwordEncoder.encode(request.pw()))
                 .role(request.role())
                 .company(company)
+                .name(request.name())
+                .phone(request.phone())
+                .email(blankToNull(request.email()))
                 .build();
         User saved = userRepository.save(user);
         return new SignUpResponse(saved.getId(), saved.getLoginId(), saved.getRole(), company.getId());
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public LoginResponse login(LoginRequest request) {

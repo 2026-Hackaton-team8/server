@@ -10,25 +10,46 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.study.jibeo.global.entity.BaseEntity;
 import org.study.jibeo.domain.company.model.Company;
+import org.study.jibeo.domain.equipmentmodel.model.EquipmentModel;
+import org.study.jibeo.global.entity.BaseEntity;
 
+/**
+ * 사용 업체가 등록한 설치 설비 1대 (예: 1층 세탁실 1호기)
+ */
 @Getter
 @Entity
 @Table(name = "equipment")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Equipment extends BaseEntity {
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "equipment_model_id", nullable = false)
+    private EquipmentModel equipmentModel;
+
     @Column(nullable = false, length = 100)
     private String name;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "maker_company_id", nullable = false)
-    private Company makerCompany;
+    @Column(nullable = false, length = 100)
+    private String location;
+
+    @Column(name = "serial_number", length = 50)
+    private String serialNumber;
 
     @Builder
-    private Equipment(String name, Company makerCompany) {
+    private Equipment(Company company, EquipmentModel equipmentModel, String name, String location, String serialNumber) {
+        this.company = company;
+        this.equipmentModel = equipmentModel;
         this.name = name;
-        this.makerCompany = makerCompany;
+        this.location = location;
+        this.serialNumber = serialNumber;
+    }
+
+    public boolean isOwnedBy(Long companyId) {
+        return company.getId().equals(companyId);
     }
 }

@@ -35,11 +35,29 @@ public class User extends BaseEntity {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
+    @Column(nullable = false, length = 50)
+    private String name;
+
+    @Column(nullable = false, length = 20)
+    private String phone;
+
+    @Column(length = 100)
+    private String email;
+
     @Builder
-    private User(String loginId, String pw, UserRole role, Company company) {
+    private User(String loginId, String pw, UserRole role, Company company, String name, String phone, String email) {
         this.loginId = loginId;
         this.pw = pw;
         this.role = role;
         this.company = company;
+        this.name = name;
+        this.phone = phone;
+        this.email = email;
+    }
+
+    public void updateContact(String name, String phone, String email) {
+        this.name = name;
+        this.phone = phone;
+        this.email = email;
     }
 }
