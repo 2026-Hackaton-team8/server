@@ -27,7 +27,14 @@ public enum ErrorCode {
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 파일은 올릴 수 없습니다."),
     UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "이미지(jpeg, png, webp, heic)나 영상(mp4, mov, webm)만 올릴 수 있습니다."),
     UNREADABLE_FILE(HttpStatus.BAD_REQUEST, "파일을 읽을 수 없습니다."),
-    ATTACHMENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "첨부 파일을 찾을 수 없습니다. 파일을 다시 올려 주세요.");
+    ATTACHMENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "첨부 파일을 찾을 수 없습니다. 파일을 다시 올려 주세요."),
+    CONSULTATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 상담입니다."),
+    CONSULTATION_CLOSED(HttpStatus.CONFLICT, "이미 끝난 상담입니다."),
+    CONSULTATION_NOT_ASKING(HttpStatus.CONFLICT, "AI 질문에만 답할 수 있습니다. 해결됐으면 '해결됐어요', 아니면 담당자를 호출하세요."),
+    CONSULTATION_EQUIPMENT_MISMATCH(HttpStatus.BAD_REQUEST, "상담한 설비와 호출할 설비가 다릅니다."),
+    SOLUTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 솔루션입니다."),
+    INVALID_SOLUTION_STATUS(HttpStatus.CONFLICT, "현재 상태에서는 할 수 없는 작업입니다."),
+    REPAIR_HISTORY_NOT_IN_MODEL(HttpStatus.BAD_REQUEST, "이 모델의 수리 이력이 아닙니다.");
 
     private final HttpStatus status;
     private final String message;

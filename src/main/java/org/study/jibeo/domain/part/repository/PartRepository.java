@@ -12,4 +12,6 @@ public interface PartRepository extends JpaRepository<Part, Long> {
     boolean existsByEquipmentModelIdAndCode(Long equipmentModelId, String code);
 
     long countByEquipmentModelId(Long equipmentModelId);
+
+    java.util.Optional<Part> findByEquipmentModelIdAndCode(Long equipmentModelId, String code);
 }

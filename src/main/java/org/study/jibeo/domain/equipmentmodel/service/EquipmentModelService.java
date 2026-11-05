@@ -19,9 +19,15 @@ import org.study.jibeo.domain.equipmentmodel.repository.EquipmentModelRepository
 import org.study.jibeo.domain.part.model.Part;
 import org.study.jibeo.domain.part.repository.PartRepository;
 import org.study.jibeo.domain.repairhistory.repository.RepairHistoryRepository;
+import org.study.jibeo.domain.solution.model.SolutionStatus;
+import org.study.jibeo.domain.solution.repository.SolutionRepository;
+import org.study.jibeo.global.ai.AiClient;
+import org.study.jibeo.global.ai.AiDtos;
 import org.study.jibeo.global.exception.ErrorCode;
 import team.themoment.sdk.exception.ExpectedException;
 
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +45,8 @@ public class EquipmentModelService {
     private final CompanyRepository companyRepository;
     private final EquipmentRepository equipmentRepository;
     private final RepairHistoryRepository repairHistoryRepository;
+    private final SolutionRepository solutionRepository;
+    private final AiClient aiClient;
 
     // ---------- 공통 (사용 업체·제작 업체) ----------
 
@@ -73,6 +81,10 @@ public class EquipmentModelService {
                 repairHistoryRepository.statByModelForMaker(makerCompanyId).stream()
                         .collect(Collectors.toMap(RepairHistoryRepository.ModelRepairStat::getModelId,
                                 Function.identity()));
+        Map<Long, Map<SolutionStatus, Long>> solutions = new HashMap<>();
+        solutionRepository.countByModelForMaker(makerCompanyId).forEach(c -> solutions
+                .computeIfAbsent(c.getModelId(), k -> new EnumMap<>(SolutionStatus.class))
+                .put(c.getStatus(), c.getCount()));
 
         return modelRepository.findAllByMakerCompanyIdOrderByCodeAsc(makerCompanyId).stream()
                 .map(model -> {
@@ -80,7 +92,9 @@ public class EquipmentModelService {
                     return MakerModelResponse.of(model,
                             installed.getOrDefault(model.getId(), 0L),
                             stat == null ? 0 : stat.getCount(),
-                            stat == null ? null : stat.getLastRepairedAt());
+                            stat == null ? null : stat.getLastRepairedAt(),
+                            solutions.getOrDefault(model.getId(), Map.of()).getOrDefault(SolutionStatus.APPROVED, 0L),
+                            solutions.getOrDefault(model.getId(), Map.of()).getOrDefault(SolutionStatus.DRAFT, 0L));
                 })
                 .toList();
     }
@@ -129,6 +143,7 @@ public class EquipmentModelService {
         EquipmentModel model = findOwnedModel(makerCompanyId, modelId);
         validateManual(modelId, manual);
         model.updateManual(manual);
+        aiClient.notifyIndex(AiDtos.IndexKind.MANUAL, model.getId());
         return manual;
     }
 

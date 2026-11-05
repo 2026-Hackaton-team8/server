@@ -15,6 +15,8 @@ import org.study.jibeo.domain.repairhistory.model.RepairHistory;
 import org.study.jibeo.domain.repairhistory.repository.RepairHistoryRepository;
 import org.study.jibeo.domain.request.model.Request;
 import org.study.jibeo.domain.request.repository.RequestRepository;
+import org.study.jibeo.global.ai.AiClient;
+import org.study.jibeo.global.ai.AiDtos;
 import org.study.jibeo.global.exception.ErrorCode;
 
 import java.time.LocalDate;
@@ -33,6 +35,7 @@ public class RepairHistoryService {
     private final PartRepository partRepository;
     private final EquipmentModelRepository modelRepository;
     private final EquipmentRepository equipmentRepository;
+    private final AiClient aiClient;
 
     /** 제작 업체: 배정된 호출에 수리 이력을 남기고 호출을 COMPLETED 로 바꾼다 */
     @Transactional
@@ -56,6 +59,7 @@ public class RepairHistoryService {
                 .difficulty(body.difficulty())
                 .repairedAt(LocalDate.now(KST))
                 .build());
+        aiClient.notifyIndex(AiDtos.IndexKind.REPAIR_HISTORY, history.getId());
         return RepairHistoryResponse.from(history);
     }
 
