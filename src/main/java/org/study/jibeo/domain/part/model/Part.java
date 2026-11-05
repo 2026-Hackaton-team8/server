@@ -4,7 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -27,7 +26,6 @@ public class Part extends BaseEntity {
     @JoinColumn(name = "equipment_id", nullable = false)
     private Equipment equipment;
 
-    @Lob
     @Column(name = "ai_summary_solution", columnDefinition = "TEXT")
     private String aiSummarySolution;
 
