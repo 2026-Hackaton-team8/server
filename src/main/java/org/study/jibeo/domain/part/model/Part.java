@@ -28,7 +28,7 @@ public class Part extends BaseEntity {
     @JoinColumn(name = "equipment_model_id", nullable = false)
     private EquipmentModel equipmentModel;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 64)
     private String code;
 
     @Column(nullable = false, length = 100)
