@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/companies").permitAll()
                         .requestMatchers("/api/maker/**").hasRole("STAFF")
                         .requestMatchers("/api/equipments/**").hasRole("WORKER")
+                        .requestMatchers("/api/requests/**").hasRole("WORKER")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(sdkSecurityErrorHandler)
