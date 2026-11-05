@@ -11,6 +11,7 @@ import org.study.jibeo.domain.request.model.Urgency;
 import org.study.jibeo.domain.user.model.User;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 호출 상세 (사용 업체 진행 상태, 제작 업체 호출 상세 공용) */
 public record RequestDetailResponse(
@@ -27,7 +28,8 @@ public record RequestDetailResponse(
         Contact contact,
         EngineerInfo engineer,
         LocalDateTime visitAt,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        List<Attachment> attachments
 ) {
 
     public record EquipmentInfo(Long id, String name, String location, String serialNumber,
@@ -43,7 +45,11 @@ public record RequestDetailResponse(
     public record EngineerInfo(Long id, String name, String phone) {
     }
 
-    public static RequestDetailResponse from(Request r) {
+    /** url = 보기용 presigned GET URL (유효 시간 10분, 화면을 열 때마다 새로 받는다) */
+    public record Attachment(String fileKey, String contentType, long size, String url) {
+    }
+
+    public static RequestDetailResponse of(Request r, List<Attachment> attachments) {
         Equipment e = r.getEquipment();
         EquipmentModel m = e.getEquipmentModel();
         User engineer = r.getEngineer();
@@ -54,6 +60,6 @@ public record RequestDetailResponse(
                 new CompanyInfo(r.getCompany().getId(), r.getCompany().getName()),
                 new Contact(r.getReporterName(), r.getReporterPhone(), r.getCompanyPhone()),
                 engineer == null ? null : new EngineerInfo(engineer.getId(), engineer.getName(), engineer.getPhone()),
-                r.getVisitAt(), r.getCreatedAt());
+                r.getVisitAt(), r.getCreatedAt(), attachments);
     }
 }

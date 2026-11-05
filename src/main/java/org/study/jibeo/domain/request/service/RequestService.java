@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.study.jibeo.domain.equipment.model.Equipment;
 import org.study.jibeo.domain.equipment.repository.EquipmentRepository;
+import org.study.jibeo.domain.file.service.FileService;
 import org.study.jibeo.domain.request.dto.AssignRequest;
 import org.study.jibeo.domain.request.dto.CreateRequestRequest;
 import org.study.jibeo.domain.request.dto.EngineerResponse;
@@ -15,14 +16,18 @@ import org.study.jibeo.domain.request.dto.RequestDetailResponse;
 import org.study.jibeo.domain.request.dto.RequestSummaryResponse;
 import org.study.jibeo.domain.request.model.CallReason;
 import org.study.jibeo.domain.request.model.Request;
+import org.study.jibeo.domain.request.model.RequestAttachment;
 import org.study.jibeo.domain.request.model.RequestStatus;
+import org.study.jibeo.domain.request.repository.RequestAttachmentRepository;
 import org.study.jibeo.domain.request.repository.RequestRepository;
 import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.exception.ErrorCode;
+import org.study.jibeo.global.storage.FileStorage;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +39,8 @@ public class RequestService {
     private final RequestRepository requestRepository;
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
+    private final RequestAttachmentRepository attachmentRepository;
+    private final FileStorage fileStorage;
 
     // ---------- 사용 업체 ----------
 
@@ -43,6 +50,7 @@ public class RequestService {
                 .filter(e -> e.isOwnedBy(companyId))
                 .orElseThrow(ErrorCode.EQUIPMENT_NOT_FOUND::toException);
         CreateRequestRequest.Contact contact = body.contact();
+        Map<String, FileStorage.FileMeta> attachments = checkAttachments(companyId, body.attachmentKeys());
 
         Request request = requestRepository.save(Request.builder()
                 .equipment(equipment)
@@ -60,7 +68,10 @@ public class RequestService {
                 .aiSummary(body.aiSummary())
                 .build());
         request.assignRequestNo();
-        return RequestDetailResponse.from(request);
+        attachments.forEach((key, meta) -> attachmentRepository.save(RequestAttachment.builder()
+                .request(request).fileKey(key).contentType(meta.contentType()).size(meta.size())
+                .build()));
+        return toDetail(request);
     }
 
     public List<RequestSummaryResponse> getMyRequests(Long companyId) {
@@ -73,7 +84,7 @@ public class RequestService {
         if (!request.isRequestedBy(companyId)) {
             throw ErrorCode.REQUEST_NOT_FOUND.toException();
         }
-        return RequestDetailResponse.from(request);
+        return toDetail(request);
     }
 
     // ---------- 제작 업체 ----------
@@ -96,7 +107,7 @@ public class RequestService {
     }
 
     public RequestDetailResponse getReceived(Long makerCompanyId, Long requestId) {
-        return RequestDetailResponse.from(findReceived(makerCompanyId, requestId));
+        return toDetail(findReceived(makerCompanyId, requestId));
     }
 
     @Transactional
@@ -106,14 +117,14 @@ public class RequestService {
                 .filter(u -> u.getRole() == UserRole.STAFF && u.getCompany().getId().equals(makerCompanyId))
                 .orElseThrow(ErrorCode.ENGINEER_NOT_FOUND::toException);
         request.assign(engineer, body.visitAt());
-        return RequestDetailResponse.from(request);
+        return toDetail(request);
     }
 
     @Transactional
     public RequestDetailResponse resolveBySelf(Long makerCompanyId, Long requestId) {
         Request request = findReceived(makerCompanyId, requestId);
         request.resolveBySelf();
-        return RequestDetailResponse.from(request);
+        return toDetail(request);
     }
 
     public List<EngineerResponse> getEngineers(Long makerCompanyId) {
@@ -122,6 +133,31 @@ public class RequestService {
     }
 
     // ---------- 공통 ----------
+
+    /** 첨부 키는 우리 회사 경로에 실제로 올라간 파일만 허용한다 (같은 키는 한 번만). 호출을 저장하기 전에 확인 */
+    private Map<String, FileStorage.FileMeta> checkAttachments(Long companyId, List<String> keys) {
+        Map<String, FileStorage.FileMeta> result = new LinkedHashMap<>();
+        if (keys == null) {
+            return result;
+        }
+        String prefix = FileService.requestAttachmentPrefix(companyId);
+        for (String key : new LinkedHashSet<>(keys)) {
+            if (!key.startsWith(prefix) || key.contains("..")) {
+                throw ErrorCode.ATTACHMENT_NOT_FOUND.toException();
+            }
+            result.put(key, fileStorage.find(key).orElseThrow(ErrorCode.ATTACHMENT_NOT_FOUND::toException));
+        }
+        return result;
+    }
+
+    private RequestDetailResponse toDetail(Request request) {
+        List<RequestDetailResponse.Attachment> attachments = attachmentRepository
+                .findAllByRequestIdOrderByIdAsc(request.getId()).stream()
+                .map(a -> new RequestDetailResponse.Attachment(a.getFileKey(), a.getContentType(), a.getSize(),
+                        fileStorage.viewUrl(a.getFileKey())))
+                .toList();
+        return RequestDetailResponse.of(request, attachments);
+    }
 
     /** 다른 제작 업체로 간 호출은 존재 여부도 드러내지 않도록 404 */
     private Request findReceived(Long makerCompanyId, Long requestId) {

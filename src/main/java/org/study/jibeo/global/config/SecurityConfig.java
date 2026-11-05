@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/maker/**").hasRole("STAFF")
                         .requestMatchers("/api/equipments/**").hasRole("WORKER")
                         .requestMatchers("/api/requests/**").hasRole("WORKER")
+                        .requestMatchers("/api/files/**").hasRole("WORKER")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(sdkSecurityErrorHandler)
