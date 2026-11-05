@@ -13,11 +13,11 @@ public record ManualResponse(String content, int version, List<Section> sections
 
     /** id = 항목 id (s-001 …), steps = 작업자 조치, escalation = 담당자 호출 기준, source = 근거 문서 */
     public record Section(String id, String title, Manual.SectionType type, List<String> errorCodes,
-                          List<String> symptoms, List<String> causes, List<String> steps, String escalation,
+                          List<String> partCodes, List<String> symptoms, List<String> causes, List<String> steps, String escalation,
                           List<String> cautions, String source, String description) {
 
         public static Section from(ManualSection s) {
-            return new Section(s.getSectionKey(), s.getTitle(), s.getType(), orEmpty(s.getErrorCodes()),
+            return new Section(s.getSectionKey(), s.getTitle(), s.getType(), orEmpty(s.getErrorCodes()), orEmpty(s.getPartCodes()),
                     orEmpty(s.getSymptoms()), orEmpty(s.getCauses()), orEmpty(s.getSteps()), s.getEscalation(),
                     orEmpty(s.getCautions()), s.getSource(), s.getDescription());
         }

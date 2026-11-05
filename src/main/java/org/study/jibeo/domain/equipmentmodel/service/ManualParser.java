@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
  * ## 고장: 냉각수가 약하게 나와요      ← 제목 하나가 항목 하나
  * 유형: 고장                          ← 개요·운전·점검·정비·고장·안전 (없으면 제목으로 판단)
  * 오류 코드: AL-151, AL-152           ← 쉼표로 나눔
+ * 부품: CNC-001:COOLING_UNIT         ← 관련 부품 코드, 쉼표로 나눔 (해결책과 함께 3D 위치로 반환)
  * 증상:                               ← 한 줄로 쓰면 1개, 아래에 - 또는 1. 목록이면 여러 개
  * - 노즐에서 냉각수가 줄줄 흐름
  * 가능한 원인: …   조치: …   주의: …  ← 목록 칸
@@ -37,7 +38,7 @@ public final class ManualParser {
     private static final Pattern HEADING = Pattern.compile("^ {0,3}#{1,6}\\s+(.+?)\\s*#*\\s*$");
     private static final Pattern FENCE = Pattern.compile("^ {0,3}(```|~~~)");
     private static final Pattern LABEL = Pattern.compile(
-            "^\\s*(유형|오류\\s*코드|알람\\s*코드|증상|가능한\\s*원인|원인|조치|담당자\\s*호출|호출\\s*기준|주의|근거)\\s*:\\s*(.*)$");
+            "^\\s*(유형|오류\\s*코드|알람\\s*코드|부품|증상|가능한\\s*원인|원인|조치|담당자\\s*호출|호출\\s*기준|주의|근거)\\s*:\\s*(.*)$");
     private static final Pattern LIST_ITEM = Pattern.compile("^\\s*(?:[-*•]|\\d+[.)])\\s+(.+)$");
     private static final Pattern SAFETY_TITLE = Pattern.compile(
             "안전\\s*(수칙|주의|경고|사항|지침|정보|안내|유의\\s*사항)|유의\\s*사항|주의\\s*사항|경고");
@@ -55,7 +56,7 @@ public final class ManualParser {
 
     /** 항목 하나. content 는 제목 아래 원문 그대로 (AI 가 인용·검색에 쓴다) */
     public record Section(String key, String title, Manual.SectionType type, List<String> errorCodes,
-                          List<String> symptoms, List<String> causes, List<String> steps, String escalation,
+                          List<String> partCodes, List<String> symptoms, List<String> causes, List<String> steps, String escalation,
                           List<String> cautions, String source, String description, String content) {
 
         /** AI 가 읽는 jsonb 항목. 담당자 호출 기준은 작업자에게 보이도록 주의사항 끝에 붙인다 */
@@ -66,7 +67,7 @@ public final class ManualParser {
             }
             List<String> aiSymptoms = new ArrayList<>(errorCodes);
             aiSymptoms.addAll(symptoms);
-            return new Manual.Section(key, title, type, aiSymptoms, List.of(), content, steps, aiCautions);
+            return new Manual.Section(key, title, type, aiSymptoms, partCodes, content, steps, aiCautions);
         }
     }
 
@@ -82,7 +83,7 @@ public final class ManualParser {
             for (int i = 0; i < chunks.size(); i++) {
                 String title = chunks.size() == 1 ? block.title() : block.title() + " (" + (i + 1) + ")";
                 sections.add(new Section(key(sections.size() + 1), truncate(title), typeByTitle(block.title()),
-                        List.of(), List.of(), List.of(), List.of(), null, List.of(), null, chunks.get(i),
+                        List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of(), null, chunks.get(i),
                         chunks.get(i)));
             }
         }
@@ -96,12 +97,13 @@ public final class ManualParser {
     // ---------- 항목 하나 읽기 ----------
 
     private enum Field {
-        TYPE, ERROR_CODES, SYMPTOMS, CAUSES, STEPS, ESCALATION, CAUTIONS, SOURCE;
+        TYPE, ERROR_CODES, PART_CODES, SYMPTOMS, CAUSES, STEPS, ESCALATION, CAUTIONS, SOURCE;
 
         static Field of(String label) {
             return switch (label.replaceAll("\\s+", "")) {
                 case "유형" -> TYPE;
                 case "오류코드", "알람코드" -> ERROR_CODES;
+                case "부품" -> PART_CODES;
                 case "증상" -> SYMPTOMS;
                 case "가능한원인", "원인" -> CAUSES;
                 case "조치" -> STEPS;
@@ -127,7 +129,7 @@ public final class ManualParser {
                 current = Field.of(label.group(1));
                 String inline = label.group(2).strip();
                 List<String> list = values.computeIfAbsent(current, f -> new ArrayList<>());
-                if (current == Field.ERROR_CODES) {
+                if (current == Field.ERROR_CODES || current == Field.PART_CODES) {
                     Arrays.stream(inline.split("[,，]")).map(String::strip).filter(s -> !s.isEmpty()).forEach(list::add);
                 } else if (!inline.isEmpty()) {
                     list.add(inline);
@@ -157,7 +159,8 @@ public final class ManualParser {
         Manual.SectionType type = values.containsKey(Field.TYPE) ? typeByWord(block.title(), text(values, Field.TYPE))
                 : typeByTitle(block.title());
         return new Section(key(index), truncate(block.title()), type,
-                list(block, values, Field.ERROR_CODES), list(block, values, Field.SYMPTOMS),
+                list(block, values, Field.ERROR_CODES), list(block, values, Field.PART_CODES),
+                list(block, values, Field.SYMPTOMS),
                 list(block, values, Field.CAUSES), list(block, values, Field.STEPS), text(values, Field.ESCALATION),
                 list(block, values, Field.CAUTIONS), text(values, Field.SOURCE),
                 description.isEmpty() ? null : description.toString().strip(), content);

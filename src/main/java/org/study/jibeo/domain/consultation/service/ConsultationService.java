@@ -22,6 +22,8 @@ import org.study.jibeo.domain.equipment.model.Equipment;
 import org.study.jibeo.domain.equipment.repository.EquipmentRepository;
 import org.study.jibeo.domain.equipmentmodel.dto.PartResponse;
 import org.study.jibeo.domain.equipmentmodel.model.EquipmentModel;
+import org.study.jibeo.domain.equipmentmodel.model.ManualSection;
+import org.study.jibeo.domain.equipmentmodel.repository.ManualSectionRepository;
 import org.study.jibeo.domain.part.model.Part;
 import org.study.jibeo.domain.part.repository.PartRepository;
 import org.study.jibeo.domain.request.model.AiSummary;
@@ -53,6 +55,7 @@ public class ConsultationService {
     private final ConsultationMessageRepository messageRepository;
     private final EquipmentRepository equipmentRepository;
     private final PartRepository partRepository;
+    private final ManualSectionRepository manualSectionRepository;
     private final UserRepository userRepository;
     private final RequestRepository requestRepository;
     private final AiClient aiClient;
@@ -164,12 +167,14 @@ public class ConsultationService {
         if (res.type() == AiDtos.TurnType.QUESTION && !outOfQuestions && notBlank(res.question())) {
             consultation.countQuestion();
             save(consultation, MessageSender.AI, MessageType.QUESTION, res.question(),
-                    new MessagePayload(res.options(), res.candidates(), null, null, null, null));
+                    new MessagePayload(res.options(), res.candidates(), null, null, null, null, null));
         } else if (res.type() == AiDtos.TurnType.SOLUTION && res.steps() != null && !res.steps().isEmpty()) {
             String cause = notBlank(res.cause()) ? res.cause() : UNKNOWN_CAUSE;
-            consultation.updateFinding(cause, part(m, res.suspectedPartCode()), res.summary());
+            List<Part> parts = solutionParts(m, res);
+            consultation.updateFinding(cause, parts.isEmpty() ? null : parts.getFirst(), res.summary());
             save(consultation, MessageSender.AI, MessageType.SOLUTION, cause,
-                    new MessagePayload(null, null, res.steps(), res.cautions(), res.evidence(), null));
+                    new MessagePayload(null, null, res.steps(), res.cautions(), res.evidence(), null,
+                            parts.stream().map(PartResponse::from).toList()));
         } else {
             // 호출 권유, 또는 질문을 다 쓰고도 질문을 돌려준 경우 → 확신 부족으로 호출 권유
             String cause = notBlank(res.cause()) ? res.cause() : UNKNOWN_CAUSE;
@@ -177,9 +182,36 @@ public class ConsultationService {
                     ? res.reason() : CallReason.LOW_CONFIDENCE;
             consultation.updateFinding(cause, part(m, res.suspectedPartCode()), res.summary());
             save(consultation, MessageSender.AI, MessageType.ESCALATE, cause,
-                    new MessagePayload(null, null, null, null, null, reason));
+                    new MessagePayload(null, null, null, null, null, reason, null));
         }
         return toDetail(consultation);
+    }
+
+    /**
+     * 해결책이 가리키는 부품. AI 가 부품 코드를 주면 그 부품, 아니면 AI 가 근거로 고른 매뉴얼 항목의 부품: 목록.
+     * 3D 뷰어가 부품 code 로 위치를 짚는다
+     */
+    private List<Part> solutionParts(EquipmentModel model, AiDtos.NextResponse res) {
+        Map<String, Part> parts = new LinkedHashMap<>();
+        Part suggested = part(model, res.suspectedPartCode());
+        if (suggested != null) {
+            parts.put(suggested.getCode(), suggested);
+        }
+        List<String> sectionIds = res.evidence() == null || res.evidence().manualSectionIds() == null
+                ? List.of() : res.evidence().manualSectionIds();
+        for (String sectionId : sectionIds) {
+            manualSectionRepository.findByEquipmentModelIdAndSectionKey(model.getId(), sectionId)
+                    .map(ManualSection::getPartCodes).orElse(List.of())
+                    .forEach(code -> {
+                        if (!parts.containsKey(code)) {
+                            Part p = part(model, code);
+                            if (p != null) {
+                                parts.put(code, p);
+                            }
+                        }
+                    });
+        }
+        return List.copyOf(parts.values());
     }
 
     private Part part(EquipmentModel model, String code) {

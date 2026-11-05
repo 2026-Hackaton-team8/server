@@ -34,6 +34,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -155,6 +156,7 @@ public class EquipmentModelService {
         } catch (IllegalArgumentException e) {
             throw new ExpectedException(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+        validatePartCodes(modelId, parsed);
         int version = model.getManual() == null ? 1 : model.getManual().version() + 1;
         Manual manual = new Manual(version, parsed.stream().map(ManualParser.Section::toAi).toList());
         model.updateManual(content, manual);
@@ -165,7 +167,7 @@ public class EquipmentModelService {
             ManualParser.Section s = parsed.get(i);
             sections.add(ManualSection.builder()
                     .equipmentModel(model).sectionKey(s.key()).sortOrder(i).type(s.type()).title(s.title())
-                    .errorCodes(s.errorCodes()).symptoms(s.symptoms()).causes(s.causes()).steps(s.steps())
+                    .errorCodes(s.errorCodes()).partCodes(s.partCodes()).symptoms(s.symptoms()).causes(s.causes()).steps(s.steps())
                     .escalation(s.escalation()).cautions(s.cautions()).source(s.source())
                     .description(s.description()).content(s.content())
                     .build());
@@ -174,6 +176,20 @@ public class EquipmentModelService {
 
         aiClient.notifyIndex(AiDtos.IndexKind.MANUAL, model.getId());
         return ManualResponse.of(content, manual, sections);
+    }
+
+    /** 부품: 줄의 코드는 이 모델에 등록된 부품이어야 한다 */
+    private void validatePartCodes(Long modelId, List<ManualParser.Section> sections) {
+        Set<String> codes = partRepository.findAllByEquipmentModelIdOrderByCodeAsc(modelId).stream()
+                .map(Part::getCode).collect(Collectors.toSet());
+        for (ManualParser.Section s : sections) {
+            for (String code : s.partCodes()) {
+                if (!codes.contains(code)) {
+                    throw new ExpectedException("항목 '%s'의 부품 코드 %s가 이 모델에 등록되어 있지 않습니다."
+                            .formatted(s.title(), code), HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
     }
 
     /** 다른 제작 업체의 모델은 존재 여부도 드러내지 않도록 404 */
