@@ -151,7 +151,10 @@ public final class ManualParser {
             }
         }
 
-        String content = block.body();
+        // 유형: 줄은 분류 정보라 원문에서 뺀다 (AI 가 안전 항목 원문을 주의사항에 그대로 붙이기 때문)
+        String content = Arrays.stream(block.body().split("\n"))
+                .filter(line -> !(LABEL.matcher(line).matches() && line.strip().startsWith("유형")))
+                .collect(java.util.stream.Collectors.joining("\n")).strip();
         if (content.length() > MAX_CONTENT_CHARS) {
             throw new IllegalArgumentException("항목 '%s'가 %d자로 너무 깁니다. %d자 이하로 나눠 주세요."
                     .formatted(block.title(), content.length(), MAX_CONTENT_CHARS));
