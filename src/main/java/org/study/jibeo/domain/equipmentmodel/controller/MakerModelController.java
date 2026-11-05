@@ -16,7 +16,8 @@ import org.study.jibeo.domain.equipmentmodel.dto.CreatePartRequest;
 import org.study.jibeo.domain.equipmentmodel.dto.MakerModelResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.ModelDetailResponse;
 import org.study.jibeo.domain.equipmentmodel.dto.PartResponse;
-import org.study.jibeo.domain.equipmentmodel.model.Manual;
+import org.study.jibeo.domain.equipmentmodel.dto.ManualResponse;
+import org.study.jibeo.domain.equipmentmodel.dto.UpdateManualRequest;
 import org.study.jibeo.domain.equipmentmodel.service.EquipmentModelService;
 import org.study.jibeo.global.security.CurrentUser;
 
@@ -49,16 +50,18 @@ public class MakerModelController {
         return modelService.createPart(CurrentUser.companyId(), modelId, request);
     }
 
+    /** content = 입력한 전문, sections = 서버가 제목 기준으로 나눈 AI 검색 항목 */
     @Operation(summary = "매뉴얼 조회")
     @GetMapping("/{modelId}/manual")
-    public Manual getManual(@PathVariable Long modelId) {
+    public ManualResponse getManual(@PathVariable Long modelId) {
         return modelService.getManual(CurrentUser.companyId(), modelId);
     }
 
-    /** 매뉴얼 전체 교체 */
-    @Operation(summary = "매뉴얼 수정")
+    /** 매뉴얼 전문을 통째로 교체. 마크다운 제목(#, ## …)마다 AI 검색 항목으로 나뉘고 AI 가 다시 색인한다 */
+    @Operation(summary = "매뉴얼 수정", description = "content 에 매뉴얼 전문(마크다운)을 넣는다. 제목마다 항목으로 나뉘며, "
+            + "제목에 안전 수칙·주의사항·경고가 있으면 안전 항목(모든 해결책의 주의사항에 붙음), 나머지는 상담 검색 대상이 된다.")
     @PutMapping("/{modelId}/manual")
-    public Manual updateManual(@PathVariable Long modelId, @Valid @RequestBody Manual manual) {
-        return modelService.updateManual(CurrentUser.companyId(), modelId, manual);
+    public ManualResponse updateManual(@PathVariable Long modelId, @Valid @RequestBody UpdateManualRequest request) {
+        return modelService.updateManual(CurrentUser.companyId(), modelId, request.content());
     }
 }
