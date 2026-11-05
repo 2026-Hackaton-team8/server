@@ -3,6 +3,7 @@ package org.study.jibeo.global.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -48,6 +49,9 @@ public class SecurityConfig {
                         .requestMatchers(SWAGGER_URLS).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/companies").permitAll()
+                        .requestMatchers("/api/maker/**").hasRole("STAFF")
+                        .requestMatchers("/api/equipments/**").hasRole("WORKER")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(sdkSecurityErrorHandler)

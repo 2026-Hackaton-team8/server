@@ -41,8 +41,7 @@ public class AuthService {
         if (userRepository.existsByLoginId(request.loginId())) {
             throw ErrorCode.DUPLICATE_LOGIN_ID.toException();
         }
-        Company company = companyRepository.findById(request.companyId())
-                .orElseThrow(() -> ErrorCode.COMPANY_NOT_FOUND.toException());
+        Company company = resolveCompany(request);
         validateRoleAgainstCompany(request.role(), company.getType());
 
         User user = User.builder()
@@ -50,9 +49,41 @@ public class AuthService {
                 .pw(passwordEncoder.encode(request.pw()))
                 .role(request.role())
                 .company(company)
+                .name(request.name())
+                .phone(request.phone())
+                .email(blankToNull(request.email()))
                 .build();
         User saved = userRepository.save(user);
         return new SignUpResponse(saved.getId(), saved.getLoginId(), saved.getRole(), company.getId());
+    }
+
+    /** 기존 회사 선택(companyId) 또는 새 회사 등록(company) 중 정확히 하나 */
+    private Company resolveCompany(SignUpRequest request) {
+        boolean pick = request.companyId() != null;
+        boolean create = request.company() != null;
+        if (pick == create) {
+            throw ErrorCode.COMPANY_CHOICE_REQUIRED.toException();
+        }
+        if (pick) {
+            return companyRepository.findById(request.companyId())
+                    .orElseThrow(ErrorCode.COMPANY_NOT_FOUND::toException);
+        }
+        SignUpRequest.NewCompany c = request.company();
+        if (companyRepository.existsByBusinessNumber(c.businessNumber())) {
+            throw ErrorCode.DUPLICATE_BUSINESS_NUMBER.toException();
+        }
+        return companyRepository.save(Company.builder()
+                .name(c.name())
+                .located(c.located())
+                .businessNumber(c.businessNumber())
+                .type(c.type())
+                .phone(c.phone())
+                .email(blankToNull(c.email()))
+                .build());
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public LoginResponse login(LoginRequest request) {

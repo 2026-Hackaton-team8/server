@@ -30,11 +30,19 @@ public class Company extends BaseEntity {
     @Column(nullable = false, length = 20)
     private CompanyType type;
 
+    @Column(nullable = false, length = 20)
+    private String phone;
+
+    @Column(length = 100)
+    private String email;
+
     @Builder
-    private Company(String name, String located, String businessNumber, CompanyType type) {
+    private Company(String name, String located, String businessNumber, CompanyType type, String phone, String email) {
         this.name = name;
         this.located = located;
         this.businessNumber = businessNumber;
         this.type = type;
+        this.phone = phone;
+        this.email = email;
     }
 }
