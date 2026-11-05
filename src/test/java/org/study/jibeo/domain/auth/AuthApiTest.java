@@ -66,12 +66,13 @@ class AuthApiTest {
                 .located("광주")
                 .businessNumber("123-45-67890")
                 .type(CompanyType.USER_COMPANY)
+                .phone("062-123-4567")
                 .build()).getId();
 
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"loginId":"worker1","pw":"password123","role":"WORKER","companyId":%d}
+                                {"loginId":"worker1","pw":"password123","role":"WORKER","name":"홍길동","phone":"010-1234-5678","companyId":%d}
                                 """.formatted(companyId)))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.data.loginId").value("worker1"));

@@ -23,6 +23,7 @@ import org.study.jibeo.domain.user.model.User;
 import org.study.jibeo.domain.user.model.UserRole;
 import org.study.jibeo.domain.user.repository.UserRepository;
 import org.study.jibeo.global.config.jwt.JwtProperties;
+import org.study.jibeo.global.exception.ErrorCode;
 import org.study.jibeo.global.config.jwt.JwtTokenProvider;
 import team.themoment.sdk.exception.ExpectedException;
 
@@ -73,7 +74,7 @@ class AuthServiceTest {
             given(companyRepository.findById(1L)).willReturn(Optional.of(company));
             given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 10L));
 
-            SignUpResponse response = authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER, 1L));
+            SignUpResponse response = authService.signUp(signUp("worker1", UserRole.WORKER, 1L));
 
             assertThat(response.userId()).isEqualTo(10L);
             assertThat(response.companyId()).isEqualTo(1L);
@@ -85,7 +86,7 @@ class AuthServiceTest {
         void 아이디가_중복이면_400() {
             given(userRepository.existsByLoginId("worker1")).willReturn(true);
 
-            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER, 1L)),
+            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 1L)),
                     HttpStatus.BAD_REQUEST, "이미 사용 중인 아이디입니다.");
         }
 
@@ -94,7 +95,7 @@ class AuthServiceTest {
             given(userRepository.existsByLoginId(anyString())).willReturn(false);
             given(companyRepository.findById(99L)).willReturn(Optional.empty());
 
-            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER, 99L)),
+            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 99L)),
                     HttpStatus.BAD_REQUEST, "존재하지 않는 회사입니다.");
         }
 
@@ -103,9 +104,52 @@ class AuthServiceTest {
             given(userRepository.existsByLoginId(anyString())).willReturn(false);
             given(companyRepository.findById(1L)).willReturn(Optional.of(company(1L, CompanyType.MAKER_COMPANY)));
 
-            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER, 1L)),
+            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, 1L)),
                     HttpStatus.BAD_REQUEST, "회사 타입과 역할이 맞지 않습니다.");
             verify(userRepository, never()).save(any());
+        }
+
+        @Test
+        void 새_회사를_함께_등록할_수_있다() {
+            given(userRepository.existsByLoginId("maker1")).willReturn(false);
+            given(companyRepository.existsByBusinessNumber("999-99-99999")).willReturn(false);
+            given(companyRepository.save(any(Company.class))).willAnswer(inv -> withId(inv.getArgument(0), 5L));
+            given(userRepository.save(any(User.class))).willAnswer(inv -> withId(inv.getArgument(0), 11L));
+
+            SignUpResponse response = authService.signUp(new SignUpRequest("maker1", "password123", UserRole.STAFF,
+                    "홍길동", "010-1234-5678", null, null, newCompany(CompanyType.MAKER_COMPANY)));
+
+            assertThat(response.companyId()).isEqualTo(5L);
+            verify(companyRepository).save(org.mockito.ArgumentMatchers.argThat(c ->
+                    c.getType() == CompanyType.MAKER_COMPANY && c.getPhone().equals("062-000-0000")));
+        }
+
+        @Test
+        void 회사를_선택도_등록도_안하면_400() {
+            given(userRepository.existsByLoginId(anyString())).willReturn(false);
+
+            assertExpected(() -> authService.signUp(signUp("worker1", UserRole.WORKER, null)),
+                    HttpStatus.BAD_REQUEST, ErrorCode.COMPANY_CHOICE_REQUIRED.getMessage());
+        }
+
+        @Test
+        void 회사를_선택과_등록_둘_다_하면_400() {
+            given(userRepository.existsByLoginId(anyString())).willReturn(false);
+
+            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
+                            "홍길동", "010-1234-5678", null, 1L, newCompany(CompanyType.USER_COMPANY))),
+                    HttpStatus.BAD_REQUEST, ErrorCode.COMPANY_CHOICE_REQUIRED.getMessage());
+        }
+
+        @Test
+        void 이미_등록된_사업자번호면_409() {
+            given(userRepository.existsByLoginId(anyString())).willReturn(false);
+            given(companyRepository.existsByBusinessNumber("999-99-99999")).willReturn(true);
+
+            assertExpected(() -> authService.signUp(new SignUpRequest("worker1", "password123", UserRole.WORKER,
+                            "홍길동", "010-1234-5678", null, null, newCompany(CompanyType.USER_COMPANY))),
+                    HttpStatus.CONFLICT, ErrorCode.DUPLICATE_BUSINESS_NUMBER.getMessage());
+            verify(companyRepository, never()).save(any());
         }
     }
 
@@ -204,6 +248,14 @@ class AuthServiceTest {
         }
     }
 
+    private static SignUpRequest signUp(String loginId, UserRole role, Long companyId) {
+        return new SignUpRequest(loginId, "password123", role, "홍길동", "010-1234-5678", null, companyId, null);
+    }
+
+    private static SignUpRequest.NewCompany newCompany(CompanyType type) {
+        return new SignUpRequest.NewCompany("새 회사", "광주", "999-99-99999", type, "062-000-0000", null);
+    }
+
     private static void assertExpected(org.assertj.core.api.ThrowableAssert.ThrowingCallable call,
                                        HttpStatus status, String message) {
         assertThatThrownBy(call)
@@ -218,6 +270,7 @@ class AuthServiceTest {
                 .located("광주")
                 .businessNumber("123-45-67890")
                 .type(type)
+                .phone("062-123-4567")
                 .build();
         return withId(company, id);
     }
@@ -228,6 +281,8 @@ class AuthServiceTest {
                 .pw(passwordEncoder.encode(rawPw))
                 .role(UserRole.WORKER)
                 .company(company(1L, CompanyType.USER_COMPANY))
+                .name("홍길동")
+                .phone("010-1234-5678")
                 .build();
         return withId(user, id);
     }
