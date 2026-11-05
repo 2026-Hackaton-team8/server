@@ -9,6 +9,7 @@ import org.study.jibeo.domain.request.model.AiSummary;
 import org.study.jibeo.domain.request.model.CallReason;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -29,7 +30,7 @@ public class StubAi {
         int asked = request.questionCount();
         if (asked < QUESTIONS.size() && asked < request.maxQuestions()) {
             return new AiDtos.NextResponse(AiDtos.TurnType.QUESTION, QUESTIONS.get(asked),
-                    List.of("오늘", "며칠 전", "모르겠어요"), List.of(), null, null, null, null, null, null, null, null);
+                    List.of("오늘", "며칠 전", "모르겠어요"), List.of(), null, null, null, null, null, null, null, null, null);
         }
 
         String tried = request.messages().stream()
@@ -40,15 +41,16 @@ public class StubAi {
         if (section.isEmpty()) {
             return new AiDtos.NextResponse(AiDtos.TurnType.ESCALATE, null, null, null,
                     "참고할 매뉴얼이 없어 원인을 좁히지 못했어요", null, null, null, null, null, CallReason.NO_HISTORY,
-                    new AiSummary(request.symptom(), "미확인", tried));
+                    new AiSummary(request.symptom(), "미확인", tried), null);
         }
         Manual.Section s = section.get();
         String partCode = s.partCodes() == null || s.partCodes().isEmpty() ? null : s.partCodes().getFirst();
         List<String> steps = s.steps() == null || s.steps().isEmpty() ? List.of(s.content()) : s.steps();
         return new AiDtos.NextResponse(AiDtos.TurnType.SOLUTION, null, null, null, s.title(), partCode, 0.5,
                 steps, s.cautions() == null ? List.of() : s.cautions(),
-                new AiDtos.Evidence(List.of(s.id()), List.of(), null), null,
-                new AiSummary(request.symptom(), s.title(), tried));
+                new AiDtos.Evidence(List.of(s.id()), List.of(), null, List.of(Map.of(
+                        "sectionId", s.id(), "title", s.title(), "originalQuote", s.content()))), null,
+                new AiSummary(request.symptom(), s.title(), tried), null);
     }
 
     public AiDtos.DraftResponse draft(AiDtos.DraftRequest request) {

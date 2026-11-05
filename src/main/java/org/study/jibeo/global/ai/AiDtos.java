@@ -5,6 +5,7 @@ import org.study.jibeo.domain.request.model.CallReason;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Python AI 와 주고받는 형식 ("짚어 AI 연동 형식 초안" 문서와 같음)
@@ -47,14 +48,17 @@ public final class AiDtos {
             List<String> cautions,
             Evidence evidence,
             CallReason reason,
-            AiSummary summary
+            AiSummary summary,
+            String aiStatus
     ) {
     }
 
     public record Candidate(String cause, String partCode, Double confidence) {
     }
 
-    public record Evidence(List<String> manualSectionIds, List<Long> repairHistoryIds, Long solutionId) {
+    /** manualSources: 근거 매뉴얼 출처·원문 (sectionId, title, version, originalQuote 등). 형식은 AI 가 정하므로 그대로 저장·전달한다 */
+    public record Evidence(List<String> manualSectionIds, List<Long> repairHistoryIds, Long solutionId,
+                           List<Map<String, Object>> manualSources) {
     }
 
     // ---------- POST /ai/solutions/draft ----------
@@ -75,10 +79,9 @@ public final class AiDtos {
 
     // ---------- POST /ai/index ----------
 
+    /** AI 는 지금 매뉴얼 색인만 받는다 (수리 이력·솔루션은 422) */
     public enum IndexKind {
-        MANUAL,
-        REPAIR_HISTORY,
-        SOLUTION
+        MANUAL
     }
 
     public record IndexRequest(IndexKind kind, Long id) {

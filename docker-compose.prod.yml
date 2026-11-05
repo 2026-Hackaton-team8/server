@@ -58,6 +58,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,https://client-nu-six-13.vercel.app}
       SERVER_FORWARD_HEADERS_STRATEGY: native
+      # Python AI 컨테이너(같은 jibeo_default 네트워크의 서비스 이름 ai). 비우면 StubAi 임시 응답
+      AI_BASE_URL: ${AI_BASE_URL-http://ai:8000}
+      AI_CONSULTATION_TIMEOUT: ${AI_CONSULTATION_TIMEOUT:-100s}
       TZ: Asia/Seoul
     ports:
       - "127.0.0.1:8080:8080"   # nginx 가 프록시
